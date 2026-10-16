@@ -9,7 +9,7 @@ import 'package:jent_web/features/mail/bloc/mail_state.dart';
 import 'package:jent_web/features/mail/view/mail_overlay.dart';
 import 'package:jent_web/features/music/bloc/music_bloc.dart';
 import 'package:jent_web/features/music/bloc/music_state.dart';
-import 'package:jent_web/features/music/view/music_player_overlay.dart';
+import 'package:jent_web/features/music/view/music_window_overlay.dart';
 import 'package:jent_web/features/notes/bloc/notes_bloc.dart';
 import 'package:jent_web/features/notes/bloc/notes_state.dart';
 import 'package:jent_web/features/notes/view/notes_overlay.dart';
@@ -199,7 +199,7 @@ class _HomePageState extends State<HomePage>
         Listener(
           key: const ValueKey('window-music'),
           onPointerDown: (_) => _focusWindow('music'),
-          child: const MusicPlayerOverlay(),
+          child: const MusicWindowOverlay(),
         ),
       ),
       MapEntry(

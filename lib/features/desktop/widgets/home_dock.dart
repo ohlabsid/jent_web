@@ -3,13 +3,12 @@ import 'package:flutter/widget_previews.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:jent_web/core/widgets/dock/dock_widget.dart';
+import 'package:jent_web/data/datasources/music_remote_datasource.dart';
 import 'package:jent_web/data/datasources/notes_remote_datasource.dart';
 import 'package:jent_web/domain/entities/email_message.dart';
-import 'package:jent_web/domain/entities/spotify_track.dart';
 import 'package:jent_web/domain/repositories/email_repository.dart';
-import 'package:jent_web/domain/repositories/spotify_repository.dart';
+import 'package:jent_web/domain/repositories/music_audio_service.dart';
 import 'package:jent_web/domain/usecases/send_email_usecase.dart';
-import 'package:jent_web/domain/usecases/spotify_usecases.dart';
 import 'package:jent_web/features/mail/bloc/mail_bloc.dart';
 import 'package:jent_web/features/mail/bloc/mail_event.dart';
 import 'package:jent_web/features/music/bloc/music_bloc.dart';
@@ -119,51 +118,35 @@ class _PreviewEmailRepository implements EmailRepository {
   Future<void> send(EmailMessage message) async {}
 }
 
-/// Disconnected Spotify stub with empty streams so the preview stays
-/// hermetic (no native plugins, no `dart:io`, no timers at startup).
-class _PreviewSpotifyRepository implements SpotifyRepository {
+/// Silent audio stub with empty streams so the preview stays
+/// hermetic (no native plugins, no network, no timers at startup).
+class _PreviewAudioService implements MusicAudioService {
   @override
-  Future<void> ensureConnected() async {}
+  Stream<Duration> get positionStream => const Stream.empty();
 
   @override
-  Future<List<SpotifyTrack>> getPlaylistTracks(String playlistId) async =>
-      const [];
+  Stream<Duration?> get durationStream => const Stream.empty();
 
   @override
-  Future<List<SpotifyTrack>> searchTracks(String query) async => const [];
+  Stream<bool> get playingStream => const Stream.empty();
 
   @override
-  Future<void> playTrack(String trackId) async {}
+  Future<void> playUrl(String url) async {}
 
   @override
-  Future<void> togglePlayback() async {}
+  Future<void> play() async {}
 
   @override
-  Future<void> nextTrack() async {}
+  Future<void> pause() async {}
 
   @override
-  Future<void> previousTrack() async {}
+  Future<void> seek(Duration position) async {}
 
   @override
-  Stream<SpotifyPlayerState> get playerState => const Stream.empty();
+  Future<void> stop() async {}
 
   @override
-  SpotifyStatus get status => SpotifyStatus.disconnected;
-
-  @override
-  Stream<SpotifyStatus> get statusStream => const Stream.empty();
-
-  @override
-  String? get lastError => null;
-
-  @override
-  String? get accountSummary => null;
-
-  @override
-  String? get effectivePlaylistId => null;
-
-  @override
-  void clearError() {}
+  Future<void> dispose() async {}
 }
 
 Widget _homeDockPreviewRoot({
@@ -194,28 +177,28 @@ Widget _homeDockPreviewRoot({
   );
 }
 
-MusicBloc _previewMusicBloc(_PreviewSpotifyRepository spotify) =>
-    MusicBloc(spotify, SearchTracks(spotify), PlaySpotifyTrack(spotify));
+MusicBloc _previewMusicBloc(_PreviewAudioService audio) =>
+    MusicBloc(audio, MusicRemoteDataSource());
 
 @Preview(name: 'HomeDock - idle', group: 'Dock', size: Size(700, 200))
 Widget homeDockIdlePreview() {
-  final spotify = _PreviewSpotifyRepository();
+  final audio = _PreviewAudioService();
   return _homeDockPreviewRoot(
     mailBloc: MailBloc(SendEmailUseCase(_PreviewEmailRepository())),
     notesBloc: NotesBloc(NotesRemoteDataSource()),
-    musicBloc: _previewMusicBloc(spotify),
+    musicBloc: _previewMusicBloc(audio),
     photosBloc: PhotosBloc(),
   );
 }
 
 @Preview(name: 'HomeDock - mail running', group: 'Dock', size: Size(700, 200))
 Widget homeDockRunningPreview() {
-  final spotify = _PreviewSpotifyRepository();
+  final audio = _PreviewAudioService();
   return _homeDockPreviewRoot(
     mailBloc: MailBloc(SendEmailUseCase(_PreviewEmailRepository()))
       ..add(ToggleOpenEmailMenu()),
     notesBloc: NotesBloc(NotesRemoteDataSource()),
-    musicBloc: _previewMusicBloc(spotify),
+    musicBloc: _previewMusicBloc(audio),
     photosBloc: PhotosBloc(),
   );
 }

@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jent_web/data/datasources/notes_remote_datasource.dart';
+import 'package:jent_web/data/datasources/music_remote_datasource.dart';
 import 'package:jent_web/features/desktop/widgets/home_dock.dart';
 import 'package:jent_web/features/mail/bloc/mail_bloc.dart';
 import 'package:jent_web/features/mail/bloc/mail_event.dart';
@@ -15,16 +16,14 @@ import 'package:jent_web/features/photos/bloc/photos_event.dart';
 import 'package:jent_web/l10n/app_localizations.dart';
 import 'package:mocktail/mocktail.dart';
 
-import 'package:jent_web/domain/repositories/spotify_repository.dart';
+import 'package:jent_web/domain/repositories/music_audio_service.dart';
 import 'package:jent_web/domain/usecases/send_email_usecase.dart';
-import 'package:jent_web/domain/usecases/spotify_usecases.dart';
 
 class _MockSendEmail extends Mock implements SendEmailUseCase {}
-class _MockSpotify extends Mock implements SpotifyRepository {}
-class _MockSearchTracks extends Mock implements SearchTracks {}
-class _MockPlayTrack extends Mock implements PlaySpotifyTrack {}
+class _MockAudio extends Mock implements MusicAudioService {}
 
 void main() {
+  setUpAll(() => registerFallbackValue(const Duration(seconds: 1)));
   /// The running-app indicator dot under a dock icon: an 8x8 grey
   /// circle. Icon tiles use rounded rectangles, so the circle shape
   /// identifies dots uniquely.
@@ -41,16 +40,24 @@ void main() {
   late PhotosBloc photosBloc;
 
   Future<void> pumpDock(WidgetTester tester) {
-    final spotify = _MockSpotify();
+    final audio = _MockAudio();
     when(
-      () => spotify.statusStream,
-    ).thenAnswer((_) => const Stream<SpotifyStatus>.empty());
+      () => audio.positionStream,
+    ).thenAnswer((_) => const Stream<Duration>.empty());
     when(
-      () => spotify.playerState,
-    ).thenAnswer((_) => const Stream<SpotifyPlayerState>.empty());
+      () => audio.durationStream,
+    ).thenAnswer((_) => const Stream<Duration?>.empty());
+    when(
+      () => audio.playingStream,
+    ).thenAnswer((_) => const Stream<bool>.empty());
+    when(() => audio.playUrl(any())).thenAnswer((_) async {});
+    when(() => audio.play()).thenAnswer((_) async {});
+    when(() => audio.pause()).thenAnswer((_) async {});
+    when(() => audio.seek(any())).thenAnswer((_) async {});
+    when(() => audio.stop()).thenAnswer((_) async {});
     mailBloc = MailBloc(_MockSendEmail());
     notesBloc = NotesBloc(NotesRemoteDataSource());
-    musicBloc = MusicBloc(spotify, _MockSearchTracks(), _MockPlayTrack());
+    musicBloc = MusicBloc(audio, MusicRemoteDataSource());
     photosBloc = PhotosBloc();
     addTearDown(() async {
       await mailBloc.close();

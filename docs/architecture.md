@@ -10,7 +10,7 @@ injectable codegen. Deployed to Firebase Hosting (`me-jent`).
 lib/
   main.dart                # DI init -> Supabase init -> runApp
   app.dart                 # Theme + l10n + router only (no blocs here)
-  router/                  # go_router: ignite -> home (+ dev spotify setup)
+  router/                  # go_router: ignite -> home
   core/                    # theme, constants, shared window/dock widgets,
                            # supabase config, base_page
   data/                    # datasources + repository impls
@@ -55,7 +55,7 @@ controller is driven by `MailBloc.isShowWindow`.
 |---|---|---|
 | wallpaper | WallpaperBloc | none (6s rotation timer) |
 | mail | MailBloc (+SendEmailUseCase) | none |
-| music | MusicBloc (Spotify repo + usecases) | none |
+| music | MusicBloc (just_audio + Supabase library) | none |
 | photos | PhotosBloc | PIN every open; guest sees general album |
 | notes | NotesBloc (+Supabase sync) | PIN every open; guest sees General folder, read-only |
 | dock | no bloc (reads 4 blocs) | n/a |

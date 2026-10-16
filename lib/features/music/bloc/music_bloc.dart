@@ -2,236 +2,93 @@ import 'dart:async';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:injectable/injectable.dart';
+import 'package:jent_web/data/datasources/music_remote_datasource.dart';
 import 'package:jent_web/domain/entities/music_track.dart';
-import 'package:jent_web/domain/repositories/spotify_repository.dart';
-import 'package:jent_web/domain/usecases/spotify_usecases.dart';
+import 'package:jent_web/domain/repositories/music_audio_service.dart';
 import 'package:jent_web/features/music/bloc/music_event.dart';
 import 'package:jent_web/features/music/bloc/music_state.dart';
 
+/// Music library player: streams tracks through [MusicAudioService]
+/// (just_audio in production, fake in tests). The catalog comes from
+/// Supabase when configured ([MusicRemoteDataSource]); otherwise the
+/// bundled [MusicPlaylist.tracks] demo fallback plays.
 @injectable
 class MusicBloc extends Bloc<MusicEvent, MusicState> {
-  Timer? _musicTimer;
-  StreamSubscription<SpotifyPlayerState>? _spotifyPlayerSub;
-  StreamSubscription<SpotifyStatus>? _spotifyStatusSub;
+  final MusicAudioService _audio;
+  final MusicRemoteDataSource _remote;
 
-  final SpotifyRepository _spotify;
-  final SearchTracks _searchTracks;
-  final PlaySpotifyTrack _playTrack;
+  StreamSubscription<Duration>? _positionSub;
+  StreamSubscription<Duration?>? _durationSub;
+  StreamSubscription<bool>? _playingSub;
 
-  MusicBloc(
-    this._spotify,
-    this._searchTracks,
-    this._playTrack,
-  ) : super(const MusicState()) {
-    on<ToggleMusicPlayer>(_onToggleMusicPlayer);
-    on<SpotifyConnectRequested>(_onSpotifyConnect);
-    on<SpotifyTracksLoaded>(_onSpotifyTracksLoaded);
-    on<SpotifySearchRequested>(_onSpotifySearch);
-    on<SpotifySearchResults>(_onSpotifySearchResults);
-    on<SpotifyPlayTrack>(_onSpotifyPlayTrack);
-    on<SpotifyPlayerUpdated>(_onSpotifyPlayerUpdated);
-    on<SpotifyStatusChanged>(_onSpotifyStatusChanged);
-    on<CloseMusicPlayer>(_onCloseMusicPlayer);
-    on<MinimizeMusicPlayer>(_onMinimizeMusicPlayer);
-    on<ExpandMusicPlayer>(_onExpandMusicPlayer);
-    on<SelectMusicTrack>(_onSelectMusicTrack);
-    on<ToggleMusicPlayback>(_onToggleMusicPlayback);
-    on<NextMusicTrack>(_onNextTrack);
-    on<PreviousMusicTrack>(_onPreviousTrack);
-    on<MusicProgressTicked>(_onProgressTicked);
+  MusicBloc(this._audio, this._remote) : super(const MusicState()) {
+    on<ToggleMusicPlayer>(_onToggle);
+    on<CloseMusicPlayer>(_onClose);
+    on<MinimizeMusicPlayer>(_onMinimize);
+    on<ExpandMusicPlayer>(_onExpand);
+    on<SelectMusicTrack>(_onSelect);
+    on<ToggleMusicPlayback>(_onTogglePlayback);
+    on<NextMusicTrack>(_onNext);
+    on<PreviousMusicTrack>(_onPrevious);
+    on<SeekMusicPosition>(_onSeek);
+    on<MusicLibrarySearchChanged>(_onSearchChanged);
+    on<MusicSidebarSelectionChanged>(_onSidebarChanged);
+    on<SelectMusicPlaylist>(_onSelectPlaylist);
+    on<MusicLibraryRequested>(_onLibraryRequested);
+    on<MusicLibraryLoaded>(_onLibraryLoaded);
+    on<MusicPositionUpdated>(_onPositionUpdated);
+    on<MusicDurationUpdated>(_onDurationUpdated);
+    on<MusicPlayingUpdated>(_onPlayingUpdated);
 
-    _spotifyStatusSub = _spotify.statusStream.listen(
-      (status) => add(SpotifyStatusChanged(status)),
+    _positionSub = _audio.positionStream.listen(
+      (p) => add(MusicPositionUpdated(p)),
     );
-    _spotifyPlayerSub = _spotify.playerState.listen(
-      (player) => add(
-        SpotifyPlayerUpdated(
-          isPlaying: player.isPlaying,
-          trackId: player.trackId,
-          position: player.position,
-          duration: player.duration,
-        ),
-      ),
+    _durationSub = _audio.durationStream.listen(
+      (d) => add(MusicDurationUpdated(d)),
+    );
+    _playingSub = _audio.playingStream.listen(
+      (playing) => add(MusicPlayingUpdated(playing)),
     );
   }
 
-  void _onToggleMusicPlayer(
-    ToggleMusicPlayer event,
-    Emitter<MusicState> emit,
-  ) {
-    final show = !state.isShowMusicPlayer;
-    if (show) {
-      emit(
-        state.copyWith(
-          isShowMusicPlayer: true,
-          isMusicMinimized: false,
-          isMusicExpanded: false,
-          isMusicPlaying: true,
-        ),
-      );
-      _startMusicTimer();
-      add(SpotifyConnectRequested());
-    } else {
+  void _onToggle(ToggleMusicPlayer event, Emitter<MusicState> emit) {
+    if (state.isShowMusicPlayer) {
       emit(state.copyWith(isShowMusicPlayer: false));
-    }
-  }
-
-  Future<void> _onSpotifyConnect(
-    SpotifyConnectRequested event,
-    Emitter<MusicState> emit,
-  ) async {
-    if (state.spotifyStatus == SpotifyStatus.ready ||
-        state.spotifyStatus == SpotifyStatus.connecting) {
       return;
     }
-    _spotify.clearError();
     emit(
       state.copyWith(
-        spotifyStatus: SpotifyStatus.connecting,
-        spotifyErrorDetail: null,
+        isShowMusicPlayer: true,
+        isMusicMinimized: false,
+        isMusicExpanded: false,
+        clearError: true,
       ),
     );
-    try {
-      await _spotify.ensureConnected();
-      final tracks = await _spotify.getPlaylistTracks('');
-      add(SpotifyTracksLoaded(tracks));
-    } catch (e) {
-      final account = _spotify.accountSummary;
-      final playlist = _spotify.effectivePlaylistId;
-      final context =
-          account != null || playlist != null
-              ? ' [account=$account playlist=$playlist]'
-              : '';
-      emit(
-        state.copyWith(
-          spotifyStatus: SpotifyStatus.error,
-          spotifyErrorDetail:
-              '${_spotify.lastError ?? e.toString()}$context',
-        ),
-      );
+    if (!state.libraryLoaded && !state.libraryLoading) {
+      add(MusicLibraryRequested());
     }
+    // No autoplay: playback starts only from an explicit user action
+    // (transport button or track row) so the play/pause button always
+    // matches the real backend state.
   }
 
-  void _onSpotifyTracksLoaded(
-    SpotifyTracksLoaded event,
-    Emitter<MusicState> emit,
-  ) {
-    emit(
-      state.copyWith(
-        spotifyTracks: event.tracks,
-        spotifyStatus: SpotifyStatus.ready,
-        musicTrackIndex: 0,
-        musicPosition: Duration.zero,
-      ),
-    );
-    if (event.tracks.isEmpty) return;
-    _stopSimulation();
-    emit(state.copyWith(isMusicPlaying: true));
-    add(SpotifyPlayTrack(event.tracks.first.id));
-  }
-
-  Future<void> _onSpotifySearch(
-    SpotifySearchRequested event,
-    Emitter<MusicState> emit,
-  ) async {
-    final query = event.query.trim();
-    emit(
-      state.copyWith(
-        spotifyQuery: event.query,
-        spotifySearching: query.isNotEmpty,
-        spotifySearchResults:
-            query.isEmpty ? const [] : state.spotifySearchResults,
-      ),
-    );
-    if (query.isEmpty) return;
-    try {
-      await _spotify.ensureConnected();
-      final results = await _searchTracks(query);
-      add(SpotifySearchResults(results));
-    } catch (_) {
-      emit(
-        state.copyWith(
-          spotifySearching: false,
-          spotifyStatus: SpotifyStatus.error,
-        ),
-      );
-    }
-  }
-
-  void _onSpotifySearchResults(
-    SpotifySearchResults event,
-    Emitter<MusicState> emit,
-  ) {
-    emit(
-      state.copyWith(
-        spotifySearchResults: event.results,
-        spotifySearching: false,
-      ),
-    );
-  }
-
-  Future<void> _onSpotifyPlayTrack(
-    SpotifyPlayTrack event,
-    Emitter<MusicState> emit,
-  ) async {
-    try {
-      await _playTrack(event.trackId);
-    } catch (_) {
-      emit(state.copyWith(spotifyStatus: SpotifyStatus.error));
-    }
-  }
-
-  void _onSpotifyPlayerUpdated(
-    SpotifyPlayerUpdated event,
-    Emitter<MusicState> emit,
-  ) {
-    if (state.spotifyStatus != SpotifyStatus.ready) return;
-    final index = state.spotifyTracks.indexWhere(
-      (t) => t.id == event.trackId,
-    );
-    _musicTimer?.cancel();
-    emit(
-      state.copyWith(
-        isMusicPlaying: event.isPlaying,
-        musicPosition: event.position,
-        musicTrackIndex: index >= 0 ? index : state.musicTrackIndex,
-      ),
-    );
-  }
-
-  void _onSpotifyStatusChanged(
-    SpotifyStatusChanged event,
-    Emitter<MusicState> emit,
-  ) {
-    emit(
-      state.copyWith(
-        spotifyStatus: event.status,
-        spotifyErrorDetail: event.status == SpotifyStatus.error
-            ? (_spotify.lastError ?? state.spotifyErrorDetail)
-            : state.spotifyErrorDetail,
-      ),
-    );
-  }
-
-  void _stopSimulation() => _musicTimer?.cancel();
-
-  void _onCloseMusicPlayer(CloseMusicPlayer event, Emitter<MusicState> emit) {
-    _musicTimer?.cancel();
+  Future<void> _onClose(CloseMusicPlayer event, Emitter<MusicState> emit) async {
+    await _audio.stop();
     emit(
       state.copyWith(
         isShowMusicPlayer: false,
         isMusicMinimized: false,
         isMusicExpanded: false,
         isMusicPlaying: false,
+        isMusicLoading: false,
         musicPosition: Duration.zero,
+        clearDuration: true,
+        clearError: true,
       ),
     );
   }
 
-  void _onMinimizeMusicPlayer(
-    MinimizeMusicPlayer event,
-    Emitter<MusicState> emit,
-  ) {
+  void _onMinimize(MinimizeMusicPlayer event, Emitter<MusicState> emit) {
     emit(
       state.copyWith(
         isShowMusicPlayer: false,
@@ -241,130 +98,225 @@ class MusicBloc extends Bloc<MusicEvent, MusicState> {
     );
   }
 
-  void _onExpandMusicPlayer(ExpandMusicPlayer event, Emitter<MusicState> emit) {
+  void _onExpand(ExpandMusicPlayer event, Emitter<MusicState> emit) {
     emit(state.copyWith(isMusicExpanded: !state.isMusicExpanded));
   }
 
-  bool get _spotifyReady =>
-      state.spotifyStatus == SpotifyStatus.ready &&
-      state.spotifyTracks.isNotEmpty;
-
-  void _onSelectMusicTrack(SelectMusicTrack event, Emitter<MusicState> emit) {
-    if (_spotifyReady) {
-      if (event.index < 0 || event.index >= state.spotifyTracks.length) {
-        return;
-      }
-      emit(
-        state.copyWith(
-          musicTrackIndex: event.index,
-          musicPosition: Duration.zero,
-          isMusicPlaying: true,
-          isShowMusicPlayer: true,
-          isMusicMinimized: false,
-        ),
-      );
-      add(SpotifyPlayTrack(state.spotifyTracks[event.index].id));
-      return;
-    }
-    if (event.index < 0 || event.index >= MusicPlaylist.tracks.length) return;
+  Future<void> _onSelect(SelectMusicTrack event, Emitter<MusicState> emit) async {
+    if (event.index < 0 || event.index >= state.tracks.length) return;
+    final track = state.tracks[event.index];
     emit(
       state.copyWith(
         musicTrackIndex: event.index,
         musicPosition: Duration.zero,
-        isMusicPlaying: true,
+        clearDuration: true,
+        isMusicLoading: true,
+        isMusicPlaying: false,
         isShowMusicPlayer: true,
         isMusicMinimized: false,
+        clearError: true,
       ),
     );
-    _startMusicTimer();
+    try {
+      await _audio.playUrl(track.audioUrl);
+      // Commit the button state here instead of waiting for the
+      // backend's playing echo: if that event is ever delayed or
+      // dropped, the button would stick on the spinner. The stream
+      // handler below just re-confirms this.
+      emit(state.copyWith(isMusicPlaying: true, isMusicLoading: false));
+    } catch (e) {
+      emit(
+        state.copyWith(
+          isMusicLoading: false,
+          isMusicPlaying: false,
+          musicError: 'Could not play this track ($e)',
+        ),
+      );
+    }
   }
 
-  Future<void> _onToggleMusicPlayback(
+  Future<void> _onTogglePlayback(
     ToggleMusicPlayback event,
     Emitter<MusicState> emit,
   ) async {
-    if (_spotifyReady) {
+    if (state.isMusicPlaying) {
       try {
-        await _spotify.togglePlayback();
-      } catch (_) {
-        emit(state.copyWith(spotifyStatus: SpotifyStatus.error));
+        await _audio.pause();
+        emit(state.copyWith(isMusicPlaying: false));
+      } catch (e) {
+        emit(state.copyWith(musicError: 'Could not pause ($e)'));
       }
       return;
     }
-    final playing = !state.isMusicPlaying;
-    emit(state.copyWith(isMusicPlaying: playing));
-    _musicTimer?.cancel();
-    if (playing) _startMusicTimer();
-  }
-
-  void _startMusicTimer() {
-    _musicTimer?.cancel();
-    _musicTimer = Timer.periodic(
-      const Duration(seconds: 1),
-      (_) => add(MusicProgressTicked(state.musicPosition + _tick)),
-    );
-  }
-
-  Future<void> _onNextTrack(
-    NextMusicTrack event,
-    Emitter<MusicState> emit,
-  ) async {
-    if (_spotifyReady) {
+    // Resume when a track was loaded and paused mid-way; otherwise
+    // (re)start the current track.
+    if (state.musicPosition > Duration.zero &&
+        (state.musicDuration == null ||
+            state.musicPosition < state.musicDuration!)) {
       try {
-        await _spotify.nextTrack();
-      } catch (_) {
-        emit(state.copyWith(spotifyStatus: SpotifyStatus.error));
+        await _audio.play();
+        emit(state.copyWith(isMusicPlaying: true));
+      } catch (e) {
+        emit(state.copyWith(musicError: 'Could not resume ($e)'));
       }
       return;
     }
-    final next = (state.musicTrackIndex + 1) % MusicPlaylist.tracks.length;
-    emit(state.copyWith(musicTrackIndex: next, musicPosition: Duration.zero));
+    add(SelectMusicTrack(state.musicTrackIndex));
   }
 
-  Future<void> _onPreviousTrack(
-    PreviousMusicTrack event,
-    Emitter<MusicState> emit,
-  ) async {
-    if (_spotifyReady) {
-      try {
-        await _spotify.previousTrack();
-      } catch (_) {
-        emit(state.copyWith(spotifyStatus: SpotifyStatus.error));
-      }
-      return;
-    }
+  void _onNext(NextMusicTrack event, Emitter<MusicState> emit) {
+    final visible = _visibleIndices;
+    if (visible.isEmpty) return;
+    final pos = visible.indexOf(state.musicTrackIndex);
+    final next = visible[(pos + 1) % visible.length];
+    add(SelectMusicTrack(next));
+  }
+
+  void _onPrevious(PreviousMusicTrack event, Emitter<MusicState> emit) {
     if (state.musicPosition > const Duration(seconds: 3)) {
-      emit(state.copyWith(musicPosition: Duration.zero));
+      add(SeekMusicPosition(Duration.zero));
       return;
     }
-    final previous =
-        (state.musicTrackIndex - 1 + MusicPlaylist.tracks.length) %
-        MusicPlaylist.tracks.length;
+    final visible = _visibleIndices;
+    if (visible.isEmpty) return;
+    final pos = visible.indexOf(state.musicTrackIndex);
+    final previous = visible[(pos - 1 + visible.length) % visible.length];
+    add(SelectMusicTrack(previous));
+  }
+
+  /// Track indices in the current playlist filter (whole library
+  /// when no playlist is selected). Transport steps within this.
+  List<int> get _visibleIndices {
+    final selected = state.selectedPlaylistId;
+    if (selected == null) {
+      return List.generate(state.tracks.length, (i) => i);
+    }
+    final ids = <String>{};
+    for (final entry in state.playlists) {
+      if (entry.$1.id == selected) ids.addAll(entry.$2);
+    }
+    final indices = <int>[];
+    for (var i = 0; i < state.tracks.length; i++) {
+      if (ids.contains(state.tracks[i].id)) indices.add(i);
+    }
+    return indices.isEmpty
+        ? List.generate(state.tracks.length, (i) => i)
+        : indices;
+  }
+
+  Future<void> _onSeek(SeekMusicPosition event, Emitter<MusicState> emit) async {
+    emit(state.copyWith(musicPosition: event.position));
+    try {
+      await _audio.seek(event.position);
+    } catch (e) {
+      emit(state.copyWith(musicError: 'Seek failed ($e)'));
+    }
+  }
+
+  void _onSearchChanged(
+    MusicLibrarySearchChanged event,
+    Emitter<MusicState> emit,
+  ) {
+    emit(state.copyWith(libraryQuery: event.query));
+  }
+
+  void _onSidebarChanged(
+    MusicSidebarSelectionChanged event,
+    Emitter<MusicState> emit,
+  ) {
     emit(
-      state.copyWith(musicTrackIndex: previous, musicPosition: Duration.zero),
+      state.copyWith(
+        sidebarSelection: event.selection,
+        clearPlaylist: true,
+      ),
     );
   }
 
-  void _onProgressTicked(MusicProgressTicked event, Emitter<MusicState> emit) {
-    // Real position arrives via the SDK stream when connected;
-    // the simulated timer only drives the offline fallback list.
-    if (state.spotifyStatus == SpotifyStatus.ready) return;
-    final duration = MusicPlaylist.tracks[state.musicTrackIndex].duration;
+  void _onSelectPlaylist(SelectMusicPlaylist event, Emitter<MusicState> emit) {
+    emit(
+      state.copyWith(
+        selectedPlaylistId: event.playlistId,
+        clearPlaylist: event.playlistId == null,
+      ),
+    );
+  }
+
+  Future<void> _onLibraryRequested(
+    MusicLibraryRequested event,
+    Emitter<MusicState> emit,
+  ) async {
+    if (state.libraryLoading) return;
+    if (state.libraryLoaded && !event.force) return;
+    emit(state.copyWith(libraryLoading: true, clearError: true));
+    final tracks = await _remote.fetchTracks();
+    if (tracks == null || tracks.isEmpty) {
+      // Offline/unconfigured/empty: keep the demo fallback.
+      emit(state.copyWith(libraryLoading: false, libraryLoaded: true));
+      return;
+    }
+    final playlists = await _remote.fetchPlaylists();
+    add(MusicLibraryLoaded(tracks, playlists ?? const []));
+  }
+
+  void _onLibraryLoaded(MusicLibraryLoaded event, Emitter<MusicState> emit) {
+    final selectedStillThere = event.playlists.any(
+      (entry) => entry.$1.id == state.selectedPlaylistId,
+    );
+    // A refresh while a track is active swaps the catalog underneath
+    // the playing audio; replay index 0 so the backend matches the
+    // newly loaded list.
+    final wasActive = state.isMusicPlaying || state.isMusicLoading;
+    emit(
+      state.copyWith(
+        tracks: event.tracks,
+        playlists: event.playlists,
+        clearPlaylist: !selectedStillThere,
+        musicTrackIndex: 0,
+        musicPosition: Duration.zero,
+        clearDuration: true,
+        libraryLoaded: true,
+        libraryLoading: false,
+      ),
+    );
+    if (wasActive) add(SelectMusicTrack(0));
+  }
+
+  void _onPositionUpdated(MusicPositionUpdated event, Emitter<MusicState> emit) {
+    if (state.tracks.isEmpty) return;
+    final current = state.tracks[state.musicTrackIndex.clamp(
+      0,
+      state.tracks.length - 1,
+    )];
+    final duration = state.musicDuration ?? current.duration;
     if (event.position >= duration) {
-      final next = (state.musicTrackIndex + 1) % MusicPlaylist.tracks.length;
-      emit(state.copyWith(musicTrackIndex: next, musicPosition: Duration.zero));
+      add(NextMusicTrack());
       return;
     }
     emit(state.copyWith(musicPosition: event.position));
   }
 
-  static const _tick = Duration(seconds: 1);
+  void _onDurationUpdated(MusicDurationUpdated event, Emitter<MusicState> emit) {
+    // Duration alone doesn't clear the loading spinner: the button
+    // must keep showing progress until the backend confirms playback
+    // (or reports an error), otherwise it flashes a play icon for a
+    // track that hasn't started yet.
+    emit(state.copyWith(musicDuration: event.duration));
+  }
+
+  void _onPlayingUpdated(MusicPlayingUpdated event, Emitter<MusicState> emit) {
+    emit(
+      state.copyWith(
+        isMusicPlaying: event.isPlaying,
+        isMusicLoading: false,
+      ),
+    );
+  }
 
   @override
   Future<void> close() {
-    _musicTimer?.cancel();
-    _spotifyPlayerSub?.cancel();
-    _spotifyStatusSub?.cancel();
+    _positionSub?.cancel();
+    _durationSub?.cancel();
+    _playingSub?.cancel();
     return super.close();
   }
 }

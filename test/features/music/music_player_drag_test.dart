@@ -2,43 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:jent_web/domain/repositories/spotify_repository.dart';
-import 'package:jent_web/domain/usecases/spotify_usecases.dart';
-import 'package:jent_web/l10n/app_localizations.dart';
+import 'package:jent_web/data/datasources/music_remote_datasource.dart';
+import 'package:jent_web/core/widgets/window/window_title_bar.dart';
 import 'package:jent_web/features/music/bloc/music_bloc.dart';
 import 'package:jent_web/features/music/bloc/music_event.dart';
-import 'package:jent_web/features/music/view/music_player_overlay.dart';
-import 'package:jent_web/features/music/view/music_window_chrome.dart';
-import 'package:mocktail/mocktail.dart';
+import 'package:jent_web/features/music/view/music_window_overlay.dart';
+import 'package:jent_web/l10n/app_localizations.dart';
 
-class _MockSpotify extends Mock implements SpotifyRepository {}
-class _MockSearchTracks extends Mock implements SearchTracks {}
-class _MockPlayTrack extends Mock implements PlaySpotifyTrack {}
+import 'fake_music_audio_service.dart';
 
 void main() {
-  testWidgets('dragging the chrome strip moves the music card', (
+  testWidgets('dragging the title bar moves the music window', (
     tester,
   ) async {
-    final spotify = _MockSpotify();
-    when(
-      () => spotify.statusStream,
-    ).thenAnswer((_) => const Stream<SpotifyStatus>.empty());
-    when(() => spotify.playerState).thenAnswer(
-      (_) => Stream.value(
-        const SpotifyPlayerState(
-          isPlaying: false,
-          trackId: '',
-          position: Duration.zero,
-          duration: Duration.zero,
-        ),
-      ),
-    );
-    when(() => spotify.status).thenReturn(SpotifyStatus.disconnected);
-    final bloc = MusicBloc(
-      spotify,
-      _MockSearchTracks(),
-      _MockPlayTrack(),
-    );
+    final audio = FakeMusicAudioService();
+    addTearDown(audio.dispose);
+    final bloc = MusicBloc(audio, MusicRemoteDataSource());
     addTearDown(bloc.close);
 
     await tester.pumpWidget(
@@ -53,7 +32,7 @@ void main() {
         home: BlocProvider.value(
           value: bloc,
           child: const Scaffold(
-            body: Stack(children: [MusicPlayerOverlay()]),
+            body: Stack(children: [MusicWindowOverlay()]),
           ),
         ),
       ),
@@ -63,13 +42,11 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 
-    expect(find.byType(MusicWindowChrome), findsOneWidget);
-
-    Offset cardPos() {
+    Offset windowPos() {
       final positioned = tester.widget<Positioned>(
         find
             .ancestor(
-              of: find.byType(MusicWindowChrome),
+              of: find.byType(WindowTitleBar),
               matching: find.byType(Positioned),
             )
             .first,
@@ -77,19 +54,23 @@ void main() {
       return Offset(positioned.left!, positioned.top!);
     }
 
-    final before = cardPos();
+    final before = windowPos();
+    // Drag the shared title-bar area: deltas accumulate, then pump
+    // twice to measure (one rebuild + one settle). The title bar
+    // (not the list body, which would scroll) moves the window.
     await tester.timedDrag(
-      find.byType(MusicWindowChrome),
+      find.byType(WindowTitleBar),
       const Offset(-100, 60),
       const Duration(milliseconds: 300),
     );
+    await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
-    final after = cardPos();
+    final after = windowPos();
     expect(after.dx, lessThan(before.dx));
     expect(after.dy, greaterThan(before.dy));
 
-    bloc.add(ToggleMusicPlayback());
+    bloc.add(CloseMusicPlayer());
     await tester.pump();
   });
 }

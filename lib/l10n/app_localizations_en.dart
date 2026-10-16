@@ -87,31 +87,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get musicUnknownArtist => 'Unknown artist';
 
   @override
-  String get musicSearchHint => 'Search songs on Spotify';
+  String get musicSearchHint => 'Search';
 
   @override
   String get musicNoResults => 'No songs found, try another search';
-
-  @override
-  String get musicConnecting => 'Connecting to Spotify…';
-
-  @override
-  String get musicConnectError => 'Spotify unavailable, playing offline';
-
-  @override
-  String get musicOfflineMode => 'Offline mode';
-
-  @override
-  String get musicOfflinePlaylist => 'Offline playlist';
-
-  @override
-  String get musicErrorTitle => 'Spotify connection failed';
-
-  @override
-  String get musicRetry => 'Retry';
-
-  @override
-  String get musicTapDetails => 'tap for details';
 
   @override
   String get dialogClose => 'Close';

@@ -257,7 +257,7 @@ abstract class AppLocalizations {
   /// No description provided for @musicSearchHint.
   ///
   /// In id, this message translates to:
-  /// **'Cari lagu di Spotify'**
+  /// **'Cari'**
   String get musicSearchHint;
 
   /// No description provided for @musicNoResults.
@@ -265,48 +265,6 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'Lagu tidak ditemukan, coba kata lain'**
   String get musicNoResults;
-
-  /// No description provided for @musicConnecting.
-  ///
-  /// In id, this message translates to:
-  /// **'Menghubungkan ke Spotify…'**
-  String get musicConnecting;
-
-  /// No description provided for @musicConnectError.
-  ///
-  /// In id, this message translates to:
-  /// **'Spotify tidak tersedia, mode luring'**
-  String get musicConnectError;
-
-  /// No description provided for @musicOfflineMode.
-  ///
-  /// In id, this message translates to:
-  /// **'Mode luring'**
-  String get musicOfflineMode;
-
-  /// No description provided for @musicOfflinePlaylist.
-  ///
-  /// In id, this message translates to:
-  /// **'Playlist luring'**
-  String get musicOfflinePlaylist;
-
-  /// No description provided for @musicErrorTitle.
-  ///
-  /// In id, this message translates to:
-  /// **'Koneksi Spotify gagal'**
-  String get musicErrorTitle;
-
-  /// No description provided for @musicRetry.
-  ///
-  /// In id, this message translates to:
-  /// **'Coba lagi'**
-  String get musicRetry;
-
-  /// No description provided for @musicTapDetails.
-  ///
-  /// In id, this message translates to:
-  /// **'ketuk untuk detail'**
-  String get musicTapDetails;
 
   /// No description provided for @dialogClose.
   ///

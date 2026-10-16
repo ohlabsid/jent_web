@@ -62,3 +62,10 @@ ui-debug.log
 
 # ================= Agent working files =================
 .zcode/
+
+# ================= Music upload sources (Binaries stay local) =================
+# MP3s dropped in music_upload/ are pushed to Supabase by
+# tool/upload_music.dart and must not be committed. The manifest
+# (tracks.json), README, and script ARE committed.
+music_upload/*.mp3
+music_upload/*.MP3

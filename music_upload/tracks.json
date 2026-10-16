@@ -1,0 +1,76 @@
+{
+  "playlists": [
+    {
+      "id": "headbang",
+      "name": "Headbang",
+      "sort_order": 2
+    }
+  ],
+  "tracks": [
+    {
+      "file": "Avenged Sevenfold - Danger Line.mp3",
+      "id": "a7x-danger-line",
+      "title": "Danger Line",
+      "artist": "Avenged Sevenfold",
+      "album": "City of Evil",
+      "duration_seconds": 328,
+      "sort_order": 1,
+      "artwork_url": "https://i.scdn.co/image/ab67616d0000b27391b3adb195fd4017fd3d6400",
+      "playlists": [
+        "headbang"
+      ]
+    },
+    {
+      "file": "Avenged Sevenfold - Almost Easy.mp3",
+      "id": "a7x-almost-easy",
+      "title": "Almost Easy",
+      "artist": "Avenged Sevenfold",
+      "album": "City of Evil",
+      "duration_seconds": 244,
+      "sort_order": 2,
+      "artwork_url": "https://i.scdn.co/image/ab67616d0000b27391b3adb195fd4017fd3d6400",
+      "playlists": [
+        "headbang"
+      ]
+    },
+    {
+      "file": "Avenged Sevenfold - Gunslinger.mp3",
+      "id": "a7x-gunslinger",
+      "title": "Gunslinger",
+      "artist": "Avenged Sevenfold",
+      "album": "City of Evil",
+      "duration_seconds": 251,
+      "sort_order": 3,
+      "artwork_url": "https://i.scdn.co/image/ab67616d0000b27391b3adb195fd4017fd3d6400",
+      "playlists": [
+        "headbang"
+      ]
+    },
+    {
+      "file": "Avenged Sevenfold - Fiction.mp3",
+      "id": "a7x-fiction",
+      "title": "Fiction",
+      "artist": "Avenged Sevenfold",
+      "album": "City of Evil",
+      "duration_seconds": 308,
+      "sort_order": 4,
+      "artwork_url": "https://i.scdn.co/image/ab67616d0000b27391b3adb195fd4017fd3d6400",
+      "playlists": [
+        "headbang"
+      ]
+    },
+    {
+      "file": "Avenged Sevenfold - M.I.A.mp3",
+      "id": "a7x-mia",
+      "title": "M.I.A",
+      "artist": "Avenged Sevenfold",
+      "album": "City of Evil",
+      "duration_seconds": 527,
+      "sort_order": 5,
+      "artwork_url": "https://i.scdn.co/image/ab67616d0000b27391b3adb195fd4017fd3d6400",
+      "playlists": [
+        "headbang"
+      ]
+    }
+  ]
+}

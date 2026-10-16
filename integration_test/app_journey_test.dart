@@ -8,7 +8,7 @@ import 'package:jent_web/di/injection.dart';
 import 'package:jent_web/features/desktop/widgets/home_dock.dart';
 import 'package:jent_web/features/mail/bloc/mail_bloc.dart';
 import 'package:jent_web/features/mail/view/mail_window.dart';
-import 'package:jent_web/features/music/view/music_window_chrome.dart';
+import 'package:jent_web/features/music/view/music_window_overlay.dart';
 
 /// Full app journey on the real DI graph: ignite loading -> greetings
 /// -> home desktop -> mail, photos, notes (guest), and music flows.
@@ -18,8 +18,8 @@ import 'package:jent_web/features/music/view/music_window_chrome.dart';
 /// (except locale-free data like note bodies and 'Pritjent').
 ///
 /// External services are absent in tests (no secrets, no network), so
-/// this asserts the offline/graceful paths: Spotify falls back to the
-/// local playlist, sending shows the error state instead of crashing.
+/// this asserts the graceful paths: music plays the bundled demo
+/// catalog, sending shows the error state instead of crashing.
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
@@ -162,20 +162,17 @@ void main() {
     expect(find.byIcon(Icons.edit_square), findsNothing);
   });
 
-  testWidgets('music: offline player opens, minimizes, restores', (
+  testWidgets('music: library window opens and lists demo tracks', (
     tester,
   ) async {
     await reachHome(tester);
 
     await tester.tap(dockIcon('music'));
-    await waitFor(tester, find.byType(MusicWindowChrome));
-    expect(find.byType(MusicWindowChrome), findsOneWidget);
+    await waitFor(tester, find.byType(MusicWindowOverlay));
+    expect(find.byType(MusicWindowOverlay), findsOneWidget);
 
-    // The offline fallback starts playing: pause icon shows. Toggling
-    // pauses it and swaps to the play icon.
-    expect(find.byIcon(Icons.pause_rounded), findsOneWidget);
-    await tester.tap(find.byIcon(Icons.pause_rounded));
-    await waitFor(tester, find.byIcon(Icons.play_arrow_rounded));
-    expect(find.byIcon(Icons.play_arrow_rounded), findsOneWidget);
+    // Sidebar plus the bundled catalog rows.
+    await waitFor(tester, find.byKey(const ValueKey('music-row-0')));
+    expect(find.byKey(const ValueKey('music-row-0')), findsOneWidget);
   });
 }

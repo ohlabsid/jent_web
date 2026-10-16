@@ -39,19 +39,14 @@ class AppDimens {
   static const double helloRise = 64.0;
   static const double helloExitLift = 48.0;
 
-  // Music player.
-  static const double musicPlayerWidth = 420.0;
-  static const double musicPlayerHeight = 200.0;
-  static const double musicPlayerRadius = 18.0;
-  static const double musicPlayerArtwork = 150.0;
-  static const double musicPlayerVinyl = 106.0;
-  static const double musicMiniVinyl = 24.0;
-  static const double musicPlayerVinylHole = 22.0;
-  static const double musicChromeHeight = 30.0;
-  static const double musicChromeLight = 11.0;
-  static const double musicMiniHeight = 56.0;
-  static const double musicExpandedWidth = 460.0;
-  static const double musicExpandedPlaylistHeight = 168.0;
+  // Music window (macOS Music-style library window).
+  static const double musicWindowWidth = 760.0;
+  static const double musicWindowHeight = 520.0;
+  static const double musicExpandedWidth = 980.0;
+  static const double musicExpandedHeight = 640.0;
+  static const double musicMinWidth = 560.0;
+  static const double musicMinHeight = 400.0;
+  static const double musicSidebarWidth = 190.0;
 
   // Photos window.
   static const double photosWindowWidth = 560.0;

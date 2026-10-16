@@ -1,103 +1,126 @@
+import 'dart:async';
+
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:jent_web/data/datasources/music_remote_datasource.dart';
+import 'package:jent_web/domain/entities/music_playlist_info.dart';
 import 'package:jent_web/domain/entities/music_track.dart';
-import 'package:jent_web/domain/entities/spotify_track.dart';
-import 'package:jent_web/domain/repositories/spotify_repository.dart';
-import 'package:jent_web/domain/usecases/spotify_usecases.dart';
 import 'package:jent_web/features/music/bloc/music_bloc.dart';
 import 'package:jent_web/features/music/bloc/music_event.dart';
 import 'package:jent_web/features/music/bloc/music_state.dart';
 import 'package:mocktail/mocktail.dart';
 
-class _MockSpotify extends Mock implements SpotifyRepository {}
-class _MockSearchTracks extends Mock implements SearchTracks {}
-class _MockPlayTrack extends Mock implements PlaySpotifyTrack {}
+import 'fake_music_audio_service.dart';
+
+class _MockRemote extends Mock implements MusicRemoteDataSource {}
+
+const _remoteTracks = [
+  MusicTrack(
+    id: 'r1',
+    title: 'Remote One',
+    artist: 'Artist A',
+    album: 'Album A',
+    duration: Duration(minutes: 2),
+    audioUrl: 'https://example.com/r1.mp3',
+  ),
+  MusicTrack(
+    id: 'r2',
+    title: 'Remote Two',
+    artist: 'Artist B',
+    album: 'Album B',
+    duration: Duration(minutes: 3),
+    audioUrl: 'https://example.com/r2.mp3',
+  ),
+  MusicTrack(
+    id: 'r3',
+    title: 'Remote Three',
+    artist: 'Artist A',
+    album: 'Album A',
+    duration: Duration(minutes: 4),
+    audioUrl: 'https://example.com/r3.mp3',
+  ),
+];
+
+const _remotePlaylists = [
+  (
+    MusicPlaylistInfo(id: 'p1', name: 'Faves'),
+    <String>['r1', 'r3'],
+  ),
+];
 
 void main() {
-  late SpotifyRepository spotify;
-  late SearchTracks searchTracks;
-  late PlaySpotifyTrack playTrack;
-
-  Stream<SpotifyPlayerState> playerStream(SpotifyPlayerState value) =>
-      Stream.value(value);
+  late FakeMusicAudioService audio;
+  late _MockRemote remote;
 
   setUp(() {
-    spotify = _MockSpotify();
-    searchTracks = _MockSearchTracks();
-    playTrack = _MockPlayTrack();
-    when(
-      () => spotify.statusStream,
-    ).thenAnswer((_) => const Stream<SpotifyStatus>.empty());
-    when(
-      () => spotify.playerState,
-    ).thenAnswer((_) => const Stream<SpotifyPlayerState>.empty());
-    when(() => spotify.status).thenReturn(SpotifyStatus.disconnected);
-    when(() => spotify.ensureConnected()).thenAnswer((_) async {});
-    when(
-      () => spotify.getPlaylistTracks(any()),
-    ).thenAnswer((_) async => const []);
+    audio = FakeMusicAudioService();
+    addTearDown(audio.dispose);
+    remote = _MockRemote();
+    // Offline by default: the demo fallback plays.
+    when(() => remote.fetchTracks()).thenAnswer((_) async => null);
+    when(() => remote.fetchPlaylists()).thenAnswer((_) async => null);
   });
 
-  MusicBloc buildBloc() =>
-      MusicBloc(spotify, searchTracks, playTrack);
+  MusicBloc buildBloc() => MusicBloc(audio, remote);
 
   group('music player', () {
     blocTest<MusicBloc, MusicState>(
-      'toggling shows the player, starts playback and connects Spotify',
+      'toggling shows the window without autoplaying',
       build: buildBloc,
       act: (bloc) => bloc.add(ToggleMusicPlayer()),
       expect: () => [
         isA<MusicState>()
             .having((s) => s.isShowMusicPlayer, 'shown', true)
-            .having((s) => s.isMusicPlaying, 'playing', true)
             .having((s) => s.isMusicMinimized, 'minimized', false)
-            .having((s) => s.isMusicExpanded, 'expanded', false),
-        isA<MusicState>().having(
-          (s) => s.spotifyStatus,
-          'spotify',
-          SpotifyStatus.connecting,
-        ),
+            .having((s) => s.isMusicLoading, 'loading', false)
+            .having((s) => s.isMusicPlaying, 'playing', false),
+        // Library fetch starts (offline: falls back to the demo list).
         isA<MusicState>()
-            .having(
-              (s) => s.spotifyTracks,
-              'tracks',
-              isEmpty,
-            )
-            .having(
-              (s) => s.spotifyStatus,
-              'spotify',
-              SpotifyStatus.ready,
-            ),
+            .having((s) => s.libraryLoading, 'libLoading', true),
+        isA<MusicState>()
+            .having((s) => s.libraryLoaded, 'libLoaded', true)
+            .having((s) => s.libraryLoading, 'libLoading', false)
+            .having((s) => s.isMusicPlaying, 'playing', false),
       ],
-      verify: (_) {
-        verify(() => spotify.ensureConnected()).called(1);
-        verify(() => spotify.getPlaylistTracks('')).called(1);
-      },
+      verify: (_) => expect(audio.playUrlCalls, 0),
     );
 
     blocTest<MusicBloc, MusicState>(
-      'toggling twice hides the player but keeps playback state',
+      'pressing play from idle starts the current track',
       build: buildBloc,
-      act: (bloc) async {
-        bloc.add(ToggleMusicPlayer());
-        await Future<void>.delayed(Duration.zero);
-        bloc.add(ToggleMusicPlayer());
-      },
-      wait: const Duration(milliseconds: 50),
+      seed: () => const MusicState(
+        isShowMusicPlayer: true,
+        libraryLoaded: true,
+      ),
+      act: (bloc) => bloc.add(ToggleMusicPlayback()),
       expect: () => [
         isA<MusicState>()
-            .having((s) => s.isShowMusicPlayer, 'shown', true)
-            .having((s) => s.isMusicPlaying, 'playing', true),
-        isA<MusicState>().having(
-          (s) => s.spotifyStatus,
-          'spotify',
-          SpotifyStatus.connecting,
-        ),
-        isA<MusicState>().having(
-          (s) => s.spotifyStatus,
-          'spotify',
-          SpotifyStatus.ready,
-        ),
+            .having((s) => s.musicTrackIndex, 'track', 0)
+            .having((s) => s.isMusicLoading, 'loading', true),
+        // Button commits as soon as the backend call succeeds,
+        // without waiting for its stream echoes.
+        isA<MusicState>()
+            .having((s) => s.isMusicPlaying, 'playing', true)
+            .having((s) => s.isMusicLoading, 'loading', false),
+        isA<MusicState>()
+            .having((s) => s.musicDuration, 'duration', audio.autoDuration),
+        isA<MusicState>().having((s) => s.isMusicPlaying, 'playing', true),
+      ],
+      verify: (_) =>
+          expect(audio.lastUrl, MusicPlaylist.tracks.first.audioUrl),
+    );
+
+    blocTest<MusicBloc, MusicState>(
+      'toggling a visible window hides it but keeps playback',
+      build: buildBloc,
+      seed: () => const MusicState(
+        isShowMusicPlayer: true,
+        isMusicPlaying: true,
+        musicDuration: Duration(minutes: 3),
+        libraryLoaded: true,
+      ),
+      act: (bloc) => bloc.add(ToggleMusicPlayer()),
+      expect: () => [
         isA<MusicState>()
             .having((s) => s.isShowMusicPlayer, 'shown', false)
             .having((s) => s.isMusicPlaying, 'playing', true),
@@ -105,29 +128,21 @@ void main() {
     );
 
     blocTest<MusicBloc, MusicState>(
-      'minimize collapses to the mini bar, reshow restores the card',
+      'minimize hides the window, toggle restores without replaying',
       build: buildBloc,
+      seed: () => const MusicState(
+        isShowMusicPlayer: true,
+        isMusicPlaying: true,
+        musicDuration: Duration(minutes: 3),
+        libraryLoaded: true,
+      ),
       act: (bloc) async {
-        bloc.add(ToggleMusicPlayer());
+        bloc.add(MinimizeMusicPlayer());
         await Future<void>.delayed(Duration.zero);
-        bloc
-          ..add(MinimizeMusicPlayer())
-          ..add(ToggleMusicPlayer());
+        bloc.add(ToggleMusicPlayer());
       },
       wait: const Duration(milliseconds: 50),
       expect: () => [
-        isA<MusicState>()
-            .having((s) => s.isShowMusicPlayer, 'shown', true),
-        isA<MusicState>().having(
-          (s) => s.spotifyStatus,
-          'spotify',
-          SpotifyStatus.connecting,
-        ),
-        isA<MusicState>().having(
-          (s) => s.spotifyStatus,
-          'spotify',
-          SpotifyStatus.ready,
-        ),
         isA<MusicState>()
             .having((s) => s.isShowMusicPlayer, 'shown', false)
             .having((s) => s.isMusicMinimized, 'minimized', true),
@@ -135,32 +150,20 @@ void main() {
             .having((s) => s.isShowMusicPlayer, 'shown', true)
             .having((s) => s.isMusicMinimized, 'minimized', false),
       ],
+      verify: (_) => expect(audio.playUrlCalls, 0),
     );
 
     blocTest<MusicBloc, MusicState>(
-      'expand toggles the full-page playlist view',
+      'expand toggles the wide library view',
       build: buildBloc,
+      seed: () => const MusicState(isShowMusicPlayer: true),
       act: (bloc) async {
-        bloc.add(ToggleMusicPlayer());
-        await Future<void>.delayed(Duration.zero);
         bloc
           ..add(ExpandMusicPlayer())
           ..add(ExpandMusicPlayer());
       },
       wait: const Duration(milliseconds: 50),
       expect: () => [
-        isA<MusicState>()
-            .having((s) => s.isShowMusicPlayer, 'shown', true),
-        isA<MusicState>().having(
-          (s) => s.spotifyStatus,
-          'spotify',
-          SpotifyStatus.connecting,
-        ),
-        isA<MusicState>().having(
-          (s) => s.spotifyStatus,
-          'spotify',
-          SpotifyStatus.ready,
-        ),
         isA<MusicState>()
             .having((s) => s.isMusicExpanded, 'expanded', true),
         isA<MusicState>()
@@ -169,12 +172,13 @@ void main() {
     );
 
     blocTest<MusicBloc, MusicState>(
-      'close stops playback and resets position',
+      'close stops the backend and resets position',
       build: buildBloc,
-      seed: () => MusicState(
+      seed: () => const MusicState(
         isShowMusicPlayer: true,
         isMusicPlaying: true,
-        musicPosition: const Duration(seconds: 42),
+        musicPosition: Duration(seconds: 42),
+        musicDuration: Duration(minutes: 3),
       ),
       act: (bloc) => bloc.add(CloseMusicPlayer()),
       expect: () => [
@@ -182,25 +186,108 @@ void main() {
             .having((s) => s.isShowMusicPlayer, 'shown', false)
             .having((s) => s.isMusicPlaying, 'playing', false)
             .having((s) => s.musicPosition, 'pos', Duration.zero),
+        // Backend echoes playing=false after stop; values unchanged.
+        isA<MusicState>()
+            .having((s) => s.isMusicPlaying, 'playing', false),
       ],
+      verify: (_) => expect(audio.stopCalls, 1),
     );
 
     blocTest<MusicBloc, MusicState>(
-      'selecting a track starts it and restores the card',
+      'selecting a track plays its stream url',
       build: buildBloc,
-      seed: () => MusicState(
-        isShowMusicPlayer: false,
-        isMusicMinimized: true,
-        isMusicPlaying: true,
-      ),
       act: (bloc) => bloc.add(SelectMusicTrack(2)),
       expect: () => [
         isA<MusicState>()
             .having((s) => s.musicTrackIndex, 'track', 2)
             .having((s) => s.musicPosition, 'pos', Duration.zero)
-            .having((s) => s.isShowMusicPlayer, 'shown', true)
-            .having((s) => s.isMusicMinimized, 'minimized', false),
+            .having((s) => s.isShowMusicPlayer, 'shown', true),
+        // Button commits as soon as the backend call succeeds,
+        // without waiting for its stream echoes.
+        isA<MusicState>()
+            .having((s) => s.isMusicPlaying, 'playing', true)
+            .having((s) => s.isMusicLoading, 'loading', false),
+        isA<MusicState>()
+            .having((s) => s.musicDuration, 'duration', audio.autoDuration),
+        isA<MusicState>().having((s) => s.isMusicPlaying, 'playing', true),
       ],
+      verify: (_) =>
+          expect(audio.lastUrl, MusicPlaylist.tracks[2].audioUrl),
+    );
+
+    blocTest<MusicBloc, MusicState>(
+      'switching tracks mid-load ends on the latest track',
+      build: buildBloc,
+      seed: () => const MusicState(
+        isShowMusicPlayer: true,
+        libraryLoaded: true,
+      ),
+      act: (bloc) {
+        bloc
+          ..add(SelectMusicTrack(0))
+          ..add(SelectMusicTrack(2));
+      },
+      wait: const Duration(milliseconds: 50),
+      expect: () => [
+        // First selection starts loading track 0...
+        isA<MusicState>()
+            .having((s) => s.musicTrackIndex, 'track', 0)
+            .having((s) => s.isMusicLoading, 'loading', true),
+        // ...backend echoes interleave, then selection 2 wins...
+        isA<MusicState>(),
+        isA<MusicState>(),
+        isA<MusicState>(),
+        isA<MusicState>(),
+        isA<MusicState>(),
+        isA<MusicState>(),
+        // ...and playback confirms on track 2.
+        isA<MusicState>()
+            .having((s) => s.musicTrackIndex, 'track', 2)
+            .having((s) => s.isMusicPlaying, 'playing', true)
+            .having((s) => s.isMusicLoading, 'loading', false),
+      ],
+      verify: (_) {
+        expect(audio.lastUrl, MusicPlaylist.tracks[2].audioUrl);
+        expect(audio.playUrlCalls, 2);
+      },
+    );
+
+    blocTest<MusicBloc, MusicState>(
+      'a failed load shows an error and later selections still play',
+      build: () {
+        audio = _FlakyAudio();
+        addTearDown(audio.dispose);
+        return buildBloc();
+      },
+      seed: () => const MusicState(
+        isShowMusicPlayer: true,
+        libraryLoaded: true,
+      ),
+      act: (bloc) async {
+        bloc.add(SelectMusicTrack(0));
+        await Future<void>.delayed(Duration.zero);
+        bloc.add(SelectMusicTrack(1));
+      },
+      wait: const Duration(milliseconds: 50),
+      expect: () => [
+        isA<MusicState>()
+            .having((s) => s.musicTrackIndex, 'track', 0)
+            .having((s) => s.isMusicLoading, 'loading', true),
+        // Timeout surfaces as an error instead of a stuck spinner.
+        isA<MusicState>()
+            .having((s) => s.isMusicLoading, 'loading', false)
+            .having((s) => s.musicError, 'error', contains('too long')),
+        // The queue is unblocked: the next tap plays normally.
+        isA<MusicState>()
+            .having((s) => s.musicTrackIndex, 'track', 1)
+            .having((s) => s.isMusicLoading, 'loading', true),
+        isA<MusicState>()
+            .having((s) => s.isMusicPlaying, 'playing', true)
+            .having((s) => s.isMusicLoading, 'loading', false),
+        isA<MusicState>(),
+        isA<MusicState>(),
+      ],
+      verify: (_) => expect(audio.lastUrl, MusicPlaylist.tracks[1].audioUrl),
     );
 
     blocTest<MusicBloc, MusicState>(
@@ -208,269 +295,250 @@ void main() {
       build: buildBloc,
       act: (bloc) => bloc.add(SelectMusicTrack(99)),
       expect: () => [],
+      verify: (_) => expect(audio.playUrlCalls, 0),
     );
 
     blocTest<MusicBloc, MusicState>(
-      'connect failure falls back to simulation with error status',
+      'play failure surfaces an error instead of hanging on loading',
       build: () {
-        when(
-          () => spotify.ensureConnected(),
-        ).thenThrow(Exception('no token'));
+        audio = _FailingAudio();
+        addTearDown(audio.dispose);
         return buildBloc();
       },
-      act: (bloc) => bloc.add(ToggleMusicPlayer()),
+      act: (bloc) => bloc.add(SelectMusicTrack(0)),
       expect: () => [
         isA<MusicState>()
-            .having((s) => s.isShowMusicPlayer, 'shown', true)
-            .having((s) => s.isMusicPlaying, 'playing', true),
-        isA<MusicState>().having(
-          (s) => s.spotifyStatus,
-          'spotify',
-          SpotifyStatus.connecting,
-        ),
-        isA<MusicState>().having(
-          (s) => s.spotifyStatus,
-          'spotify',
-          SpotifyStatus.error,
-        ),
+            .having((s) => s.isMusicLoading, 'loading', true),
+        isA<MusicState>()
+            .having((s) => s.isMusicLoading, 'loading', false)
+            .having((s) => s.musicError, 'error', isNotNull),
       ],
     );
 
     blocTest<MusicBloc, MusicState>(
-      'loaded Spotify tracks replace the fallback list and autoplay first',
-      build: () {
-        const tracks = [
-          SpotifyTrack(
-            id: 'abc',
-            title: 'Real Song',
-            artist: 'Real Artist',
-            artworkUrl: 'https://img/x.jpg',
-            duration: Duration(minutes: 3),
-          ),
-        ];
-        when(
-          () => spotify.getPlaylistTracks(any()),
-        ).thenAnswer((_) async => tracks);
-        when(
-          () => playTrack(any()),
-        ).thenAnswer((_) async {});
-        return buildBloc();
-      },
-      act: (bloc) => bloc.add(ToggleMusicPlayer()),
-      expect: () => [
-        isA<MusicState>()
-            .having((s) => s.isShowMusicPlayer, 'shown', true),
-        isA<MusicState>().having(
-          (s) => s.spotifyStatus,
-          'spotify',
-          SpotifyStatus.connecting,
-        ),
-        isA<MusicState>()
-            .having((s) => s.spotifyTracks, 'tracks', hasLength(1))
-            .having(
-              (s) => s.spotifyStatus,
-              'spotify',
-              SpotifyStatus.ready,
-            )
-            .having((s) => s.musicTrackIndex, 'track', 0)
-            .having((s) => s.musicPosition, 'pos', Duration.zero),
-        isA<MusicState>().having((s) => s.isMusicPlaying, 'playing', true),
-      ],
-      verify: (_) => verify(() => playTrack('abc')).called(1),
-    );
-
-    blocTest<MusicBloc, MusicState>(
-      'empty Spotify list keeps fallback without autoplay',
-      build: () {
-        when(
-          () => spotify.getPlaylistTracks(any()),
-        ).thenAnswer((_) async => const []);
-        return buildBloc();
-      },
-      act: (bloc) => bloc.add(ToggleMusicPlayer()),
-      expect: () => [
-        isA<MusicState>()
-            .having((s) => s.isShowMusicPlayer, 'shown', true),
-        isA<MusicState>().having(
-          (s) => s.spotifyStatus,
-          'spotify',
-          SpotifyStatus.connecting,
-        ),
-        isA<MusicState>()
-            .having((s) => s.spotifyTracks, 'tracks', isEmpty)
-            .having(
-              (s) => s.spotifyStatus,
-              'spotify',
-              SpotifyStatus.ready,
-            ),
-      ],
-      verify: (_) => verifyNever(() => playTrack(any())),
-    );
-
-    blocTest<MusicBloc, MusicState>(
-      'search emits results',
-      build: () {
-        const results = [
-          SpotifyTrack(
-            id: 'xyz',
-            title: 'Found',
-            artist: 'Someone',
-            artworkUrl: '',
-            duration: Duration(minutes: 2),
-          ),
-        ];
-        when(
-          () => searchTracks(any()),
-        ).thenAnswer((_) async => results);
-        return buildBloc();
-      },
-      act: (bloc) => bloc.add(SpotifySearchRequested('hello')),
-      expect: () => [
-        isA<MusicState>()
-            .having((s) => s.spotifyQuery, 'query', 'hello')
-            .having((s) => s.spotifySearching, 'searching', true),
-        isA<MusicState>()
-            .having((s) => s.spotifySearchResults, 'results', hasLength(1))
-            .having((s) => s.spotifySearching, 'searching', false),
-      ],
-      verify: (_) => verify(() => searchTracks('hello')).called(1),
-    );
-
-    blocTest<MusicBloc, MusicState>(
-      'empty query clears results immediately',
+      'pause then resume reuses the loaded stream',
       build: buildBloc,
-      seed: () => MusicState(
-        spotifySearchResults: const [
-          SpotifyTrack(
-            id: 'xyz',
-            title: 'Found',
-            artist: 'Someone',
-            artworkUrl: '',
-            duration: Duration(minutes: 2),
-          ),
-        ],
+      seed: () => const MusicState(
+        isShowMusicPlayer: true,
+        isMusicPlaying: true,
+        musicPosition: Duration(seconds: 10),
+        musicDuration: Duration(minutes: 3),
       ),
-      act: (bloc) => bloc.add(SpotifySearchRequested('   ')),
-      expect: () => [
-        isA<MusicState>()
-            .having((s) => s.spotifyQuery, 'query', '   ')
-            .having((s) => s.spotifySearching, 'searching', false)
-            .having((s) => s.spotifySearchResults, 'results', isEmpty),
-      ],
-      verify: (_) => verifyNever(() => searchTracks(any())),
-    );
-
-    blocTest<MusicBloc, MusicState>(
-      'playing a Spotify track delegates to the repository',
-      build: () {
-        when(
-          () => playTrack(any()),
-        ).thenAnswer((_) async {});
-        return buildBloc();
+      act: (bloc) async {
+        bloc.add(ToggleMusicPlayback());
+        await Future<void>.delayed(Duration.zero);
+        bloc.add(ToggleMusicPlayback());
       },
-      act: (bloc) => bloc.add(SpotifyPlayTrack('abc123')),
-      expect: () => [],
-      verify: (_) => verify(() => playTrack('abc123')).called(1),
-    );
-
-    blocTest<MusicBloc, MusicState>(
-      'real player state drives playing flag and position',
-      build: () {
-        when(() => spotify.playerState).thenAnswer(
-          (_) => playerStream(
-            const SpotifyPlayerState(
-              isPlaying: true,
-              trackId: 'abc',
-              position: Duration(seconds: 30),
-              duration: Duration(minutes: 3),
-            ),
-          ),
-        );
-        return buildBloc();
-      },
-      seed: () => MusicState(
-        spotifyStatus: SpotifyStatus.ready,
-        spotifyTracks: const [
-          SpotifyTrack(
-            id: 'abc',
-            title: 'Real Song',
-            artist: 'Real Artist',
-            artworkUrl: '',
-            duration: Duration(minutes: 3),
-          ),
-        ],
-      ),
-      expect: () => [
-        isA<MusicState>()
-            .having((s) => s.isMusicPlaying, 'playing', true)
-            .having((s) => s.musicPosition, 'pos', const Duration(seconds: 30))
-            .having((s) => s.musicTrackIndex, 'track', 0),
-      ],
-    );
-
-    blocTest<MusicBloc, MusicState>(
-      'transport uses Spotify when connected',
-      build: () {
-        when(() => spotify.togglePlayback()).thenAnswer((_) async {});
-        when(() => spotify.nextTrack()).thenAnswer((_) async {});
-        when(() => spotify.previousTrack()).thenAnswer((_) async {});
-        return buildBloc();
-      },
-      seed: () => MusicState(
-        spotifyStatus: SpotifyStatus.ready,
-        spotifyTracks: const [
-          SpotifyTrack(
-            id: 'abc',
-            title: 'Real Song',
-            artist: 'Real Artist',
-            artworkUrl: '',
-            duration: Duration(minutes: 3),
-          ),
-        ],
-      ),
-      act: (bloc) {
-        bloc
-          ..add(ToggleMusicPlayback())
-          ..add(NextMusicTrack())
-          ..add(PreviousMusicTrack());
-      },
-      expect: () => [],
+      wait: const Duration(milliseconds: 50),
       verify: (_) {
-        verify(() => spotify.togglePlayback()).called(1);
-        verify(() => spotify.nextTrack()).called(1);
-        verify(() => spotify.previousTrack()).called(1);
+        expect(audio.pauseCalls, 1);
+        expect(audio.playCalls, 1);
+        expect(audio.playUrlCalls, 0);
       },
     );
 
     blocTest<MusicBloc, MusicState>(
-      'restart position when previous is hit early in a track',
+      'seek forwards to the backend',
       build: buildBloc,
-      seed: () => MusicState(
+      act: (bloc) =>
+          bloc.add(SeekMusicPosition(const Duration(seconds: 30))),
+      expect: () => [
+        isA<MusicState>()
+            .having((s) => s.musicPosition, 'pos', const Duration(seconds: 30)),
+        isA<MusicState>()
+            .having((s) => s.musicPosition, 'pos', const Duration(seconds: 30)),
+      ],
+      verify: (_) =>
+          expect(audio.seeks, [const Duration(seconds: 30)]),
+    );
+
+    blocTest<MusicBloc, MusicState>(
+      'previous restarts the track when played past 3 seconds',
+      build: buildBloc,
+      seed: () => const MusicState(
+        isShowMusicPlayer: true,
         musicTrackIndex: 1,
-        musicPosition: const Duration(seconds: 10),
+        musicPosition: Duration(seconds: 10),
+        musicDuration: Duration(minutes: 3),
       ),
       act: (bloc) => bloc.add(PreviousMusicTrack()),
       expect: () => [
-        isA<MusicState>()
-            .having((s) => s.musicTrackIndex, 'track', 1)
-            .having((s) => s.musicPosition, 'pos', Duration.zero),
+        isA<MusicState>().having((s) => s.musicPosition, 'pos', Duration.zero),
+        isA<MusicState>().having((s) => s.musicPosition, 'pos', Duration.zero),
       ],
+      verify: (_) => expect(audio.playUrlCalls, 0),
     );
 
     blocTest<MusicBloc, MusicState>(
-      'advances to the next track at the end of the duration',
+      'reaching the end auto-advances to the next track',
       build: buildBloc,
+      seed: () => const MusicState(
+        isShowMusicPlayer: true,
+        isMusicPlaying: true,
+        musicTrackIndex: 0,
+        musicDuration: Duration(minutes: 3),
+      ),
       act: (bloc) => bloc.add(
-        MusicProgressTicked(
-          MusicPlaylist.tracks[0].duration + const Duration(seconds: 1),
+        MusicPositionUpdated(
+          const Duration(minutes: 3, seconds: 1),
         ),
       ),
       expect: () => [
         isA<MusicState>()
             .having((s) => s.musicTrackIndex, 'track', 1)
             .having((s) => s.musicPosition, 'pos', Duration.zero),
+        isA<MusicState>(),
+        isA<MusicState>(),
+        isA<MusicState>(),
+      ],
+      verify: (_) =>
+          expect(audio.lastUrl, MusicPlaylist.tracks[1].audioUrl),
+    );
+
+    blocTest<MusicBloc, MusicState>(
+      'library search and sidebar selection are stored',
+      build: buildBloc,
+      act: (bloc) {
+        bloc
+          ..add(MusicLibrarySearchChanged('ghibli'))
+          ..add(
+            MusicSidebarSelectionChanged(MusicSidebarSelection.albums),
+          );
+      },
+      expect: () => [
+        isA<MusicState>()
+            .having((s) => s.libraryQuery, 'query', 'ghibli'),
+        isA<MusicState>().having(
+          (s) => s.sidebarSelection,
+          'sidebar',
+          MusicSidebarSelection.albums,
+        ),
       ],
     );
-  
+
+    blocTest<MusicBloc, MusicState>(
+      'remote tracks and playlists replace the fallback on first open',
+      build: () {
+        when(() => remote.fetchTracks())
+            .thenAnswer((_) async => _remoteTracks);
+        when(() => remote.fetchPlaylists())
+            .thenAnswer((_) async => _remotePlaylists);
+        return buildBloc();
+      },
+      act: (bloc) => bloc.add(ToggleMusicPlayer()),
+      expect: () => [
+        isA<MusicState>()
+            .having((s) => s.isShowMusicPlayer, 'shown', true),
+        isA<MusicState>()
+            .having((s) => s.libraryLoading, 'libLoading', true),
+        // Remote wins without starting playback: the user presses
+        // play explicitly.
+        isA<MusicState>()
+            .having(
+              (s) => s.tracks.map((t) => t.id).toList(),
+              'trackIds',
+              ['r1', 'r2', 'r3'],
+            )
+            .having(
+              (s) => s.playlists.map((p) => p.$1.name).toList(),
+              'playlists',
+              ['Faves'],
+            )
+            .having((s) => s.libraryLoaded, 'libLoaded', true)
+            .having((s) => s.isMusicPlaying, 'playing', false),
+      ],
+      verify: (_) => expect(audio.playUrlCalls, 0),
+    );
+
+    blocTest<MusicBloc, MusicState>(
+      'empty remote keeps the demo fallback',
+      build: () {
+        when(() => remote.fetchTracks())
+            .thenAnswer((_) async => const <MusicTrack>[]);
+        return buildBloc();
+      },
+      act: (bloc) => bloc.add(MusicLibraryRequested(force: true)),
+      expect: () => [
+        isA<MusicState>()
+            .having((s) => s.libraryLoading, 'libLoading', true),
+        isA<MusicState>()
+            .having((s) => s.libraryLoaded, 'libLoaded', true)
+            .having((s) => s.tracks, 'tracks', MusicPlaylist.tracks),
+      ],
+      verify: (_) => expect(audio.playUrlCalls, 0),
+    );
+
+    blocTest<MusicBloc, MusicState>(
+      'selecting a playlist filters next/previous to its tracks',
+      build: buildBloc,
+      seed: () => const MusicState(
+        isShowMusicPlayer: true,
+        tracks: _remoteTracks,
+        playlists: _remotePlaylists,
+        libraryLoaded: true,
+      ),
+      act: (bloc) async {
+        bloc.add(SelectMusicPlaylist('p1'));
+        await Future<void>.delayed(Duration.zero);
+        bloc.add(NextMusicTrack());
+      },
+      wait: const Duration(milliseconds: 50),
+      expect: () => [
+        isA<MusicState>()
+            .having((s) => s.selectedPlaylistId, 'playlist', 'p1'),
+        // From index 0 (r1, in playlist) next steps to index 2 (r3),
+        // skipping r2 which is not in the playlist.
+        isA<MusicState>()
+            .having((s) => s.musicTrackIndex, 'track', 2),
+        isA<MusicState>(),
+        isA<MusicState>(),
+        isA<MusicState>(),
+      ],
+      verify: (_) => expect(audio.lastUrl, _remoteTracks[2].audioUrl),
+    );
+
+    blocTest<MusicBloc, MusicState>(
+      'sidebar selection clears the playlist filter',
+      build: buildBloc,
+      seed: () => const MusicState(
+        tracks: _remoteTracks,
+        playlists: _remotePlaylists,
+        selectedPlaylistId: 'p1',
+        libraryLoaded: true,
+      ),
+      act: (bloc) => bloc.add(
+        MusicSidebarSelectionChanged(MusicSidebarSelection.albums),
+      ),
+      expect: () => [
+        isA<MusicState>()
+            .having((s) => s.selectedPlaylistId, 'playlist', isNull)
+            .having(
+              (s) => s.sidebarSelection,
+              'sidebar',
+              MusicSidebarSelection.albums,
+            ),
+      ],
+    );
   });
+}
+
+class _FailingAudio extends FakeMusicAudioService {
+  @override
+  Future<void> playUrl(String url) async {
+    throw Exception('no network');
+  }
+}
+
+/// Backend that stalls once (like a hung load) and works after.
+class _FlakyAudio extends FakeMusicAudioService {
+  var failNext = true;
+
+  @override
+  Future<void> playUrl(String url) async {
+    if (failNext) {
+      failNext = false;
+      throw TimeoutException('taking too long to load audio');
+    }
+    return super.playUrl(url);
+  }
 }

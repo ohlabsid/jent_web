@@ -19,14 +19,24 @@ Window flags: open/close/minimize/expand + `EmailStatus`
 native, Web3Forms POST on web (see `backend-and-secrets.md`).
 Dock dot = open OR minimized; dock tap toggles close/open.
 
-## music (`MusicBloc`, needs `SpotifyRepository`, `SearchTracks`,
-## `PlaySpotifyTrack`)
-Toggle opens player + connects Spotify; falls back to local
-`MusicPlaylist` simulation (1s timer) when Spotify unavailable.
-States: show/minimize/expand, play/pause, track index, position,
-`spotifyStatus`, search results. Views: player overlay (card + mini
-bar), chrome, artwork, controls, search, expanded playlist.
-Quiesce timers in tests via `CloseMusicPlayer` (cancels the sim timer).
+## music (`MusicBloc`, needs `MusicAudioService`,
+## `MusicRemoteDataSource`)
+Library window (macOS Music style): sidebar (Songs/Albums/Artists +
+playlists), toolbar with local search + refresh, track list, and a
+bottom now-playing bar with a seekable slider. Track rows and the
+now-playing art box render `artwork_url` with a placeholder fallback. Catalog loads from
+Supabase (`music_tracks`, `music_playlists`, public `music` bucket)
+on first open — remote wins when non-empty; the bundled
+`MusicPlaylist` demo catalog is the offline fallback. Playback
+downloads each song once into a local cache (blob URL on web, temp
+file on native; 5-song LRU), so replays and switches are instant
+and a tap never waits on a stale fetch. States:
+show/minimize/expand, play/pause/loading, track index,
+position/duration, library query, sidebar selection,
+`selectedPlaylistId`, `libraryLoaded/Loading`. Transport steps
+within the selected playlist. `MusicAudioService` + the remote
+datasource keep tests hermetic (fakes in tests, just_audio +
+Supabase in production).
 
 ## photos (`PhotosBloc`, shared `vaultPin`, default `1234`)
 PIN gate on EVERY open (correct PIN → private album; wrong PIN →

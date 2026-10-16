@@ -87,31 +87,10 @@ class AppLocalizationsId extends AppLocalizations {
   String get musicUnknownArtist => 'Artis tidak dikenal';
 
   @override
-  String get musicSearchHint => 'Cari lagu di Spotify';
+  String get musicSearchHint => 'Cari';
 
   @override
   String get musicNoResults => 'Lagu tidak ditemukan, coba kata lain';
-
-  @override
-  String get musicConnecting => 'Menghubungkan ke Spotify…';
-
-  @override
-  String get musicConnectError => 'Spotify tidak tersedia, mode luring';
-
-  @override
-  String get musicOfflineMode => 'Mode luring';
-
-  @override
-  String get musicOfflinePlaylist => 'Playlist luring';
-
-  @override
-  String get musicErrorTitle => 'Koneksi Spotify gagal';
-
-  @override
-  String get musicRetry => 'Coba lagi';
-
-  @override
-  String get musicTapDetails => 'ketuk untuk detail';
 
   @override
   String get dialogClose => 'Tutup';
