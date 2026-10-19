@@ -39,7 +39,7 @@ Learned the hard way — read before writing code or tests.
 
 ## Deploys
 - Canonical live site is the **Dokploy VPS** (GitHub Actions builds
-  the bundle → `ghcr.io/fritzent/jent_web:latest` → webhook redeploys;
+  the bundle → `ghcr.io/ohlabsid/jent_web:latest` → webhook redeploys;
   see `workflows.md`). `https://jentweb.web.app` is a FROZEN fallback
   (its workflow is manual-only) and `me-jent.web.app` is legacy —
   both can be many features behind, never test against them.

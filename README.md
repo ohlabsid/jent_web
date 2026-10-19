@@ -104,7 +104,7 @@ flutter drive --driver=test_driver/integration_test.dart \
 ```
 
 Deploy: every push to `main` builds in CI, ships
-`ghcr.io/fritzent/jent_web:latest`, and redeploys the Dokploy VPS via
+`ghcr.io/ohlabsid/jent_web:latest`, and redeploys the Dokploy VPS via
 webhook (details in `docs/workflows.md`; local check:
 `flutter build web --release && docker build -t jent_web . && docker run -p 8080:80 jent_web`).
 

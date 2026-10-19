@@ -16,7 +16,11 @@ on:
   workflow_dispatch:
 
 env:
-  IMAGE: ghcr.io/fritzent/jent_web
+  # Derived from the repo, NOT hardcoded: this project's GitHub
+  # location has moved before (Fritzent -> ohlabsid), and pushing to
+  # a namespace that doesn't match the token's owner fails with
+  # GHCR's cryptic "The requested installation does not exist".
+  IMAGE: ghcr.io/${{ github.repository_owner }}/jent_web
 
 permissions:
   contents: read
@@ -97,11 +101,11 @@ jobs:
           curl -sS -H "Content-Type: application/json" -d "{
             \"embeds\": [{
               \"title\": \"✅ Deployed to Dokploy — jentweb\",
-              \"url\": \"https://github.com/Fritzent/jent_web/pkgs/container/jent_web\",
+              \"url\": \"https://github.com/${GITHUB_REPOSITORY}/pkgs/container/jent_web\",
               \"color\": 5763719,
               \"description\": \"New image pushed to GHCR and Dokploy webhook fired.\",
               \"fields\": [
-                {\"name\": \"Image\", \"value\": \"ghcr.io/fritzent/jent_web:${GITHUB_SHA::7}\", \"inline\": false},
+                {\"name\": \"Image\", \"value\": \"${IMAGE}:${GITHUB_SHA::7}\", \"inline\": false},
                 {\"name\": \"Commit\", \"value\": \"${GITHUB_SHA::7} by ${GITHUB_ACTOR}\", \"inline\": true},
                 {\"name\": \"Branch\", \"value\": \"${GITHUB_REF_NAME}\", \"inline\": true}
               ],

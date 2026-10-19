@@ -46,7 +46,7 @@ docker run -p 8080:80 jent_web  # local smoke check of the same image
 ```
 CI (`.github/workflows/deploy-dokploy.yml`) does this on every push to
 main: builds the bundle from the repo secrets, pushes
-`ghcr.io/fritzent/jent_web:{latest,<sha>}`, then curls the Dokploy
+`ghcr.io/ohlabsid/jent_web:{latest,<sha>}`, then curls the Dokploy
 webhook so the VPS re-pulls `latest`. The VPS never builds anything —
 no Flutter SDK, no RAM pressure, secrets stay in GitHub.
 
@@ -66,7 +66,7 @@ Settings > Secrets and variables > Actions.
 
 ### First-time Dokploy setup (web UI)
 1. Projects → Create (`jentweb`) → Create Resource → Application,
-   source **Docker Image**, image `ghcr.io/fritzent/jent_web:latest`,
+   source **Docker Image**, image `ghcr.io/ohlabsid/jent_web:latest`,
    port **80**. The package must be public, or add a `read:packages`
    PAT under Dokploy → Settings → Registry.
 2. App → Domains → generate a free `traefik.me` domain (or attach a
