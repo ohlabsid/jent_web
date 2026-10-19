@@ -1,6 +1,7 @@
 # Pritjent — a macOS desktop that is secretly a portfolio 💻✨
 
-Live at **https://jentweb.web.app** · Flutter Web · Firebase Hosting
+Flutter Web · self-hosted on a VPS via **Dokploy** (GitHub Actions →
+GHCR → webhook) · Firebase fallback: https://jentweb.web.app (frozen)
 
 Boot it up and you don't get a website — you get a **desktop**. A
 loading screen fills a logo with water, greetings from 8 languages
@@ -102,8 +103,10 @@ flutter drive --driver=test_driver/integration_test.dart \
   --target=integration_test/app_journey_test.dart -d web-server
 ```
 
-Deploy: `flutter build web --release --base-href /` (+ same defines)
-then `firebase deploy --only hosting --project jentweb`.
+Deploy: every push to `main` builds in CI, ships
+`ghcr.io/fritzent/jent_web:latest`, and redeploys the Dokploy VPS via
+webhook (details in `docs/workflows.md`; local check:
+`flutter build web --release && docker build -t jent_web . && docker run -p 8080:80 jent_web`).
 
 > AI agents: start at [`AGENTS.md`](AGENTS.md) — it points into
 > [`docs/`](docs/) with the full architecture, feature, and workflow

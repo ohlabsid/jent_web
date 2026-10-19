@@ -2,7 +2,9 @@
 
 Personal portfolio site ("Pritjent") as a fake macOS desktop on the web.
 Flutter + `flutter_bloc` (BLoC = the ViewModel layer) + GetIt +
-injectable codegen. Deployed to Firebase Hosting (`jentweb`).
+injectable codegen. Deployed via GitHub Actions → nginx image on GHCR
+→ Dokploy webhook on a VPS (Firebase Hosting kept as a manual-only
+fallback; see `docs/workflows.md`).
 
 ## Folder map
 

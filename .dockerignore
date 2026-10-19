@@ -1,0 +1,7 @@
+# Ship only the built bundle + image config to the daemon; the repo
+# (sources, .git, platform folders) stays out of the build context.
+**
+!build/web
+!build/web/**
+!Dockerfile
+!nginx.conf

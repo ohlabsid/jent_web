@@ -1,0 +1,102 @@
+# ================= Misc / OS =================
+*.class
+*.log
+*.pyc
+*.swp
+*.orig
+*.rej
+.DS_Store
+Thumbs.db
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+
+# ================= Secrets (never commit credentials) =================
+.env
+*.env
+*.jks
+*.keystore
+key.properties
+GoogleService-Info.plist
+google-services.json
+
+# ================= Flutter / Dart / Pub =================
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+/build/
+/coverage/
+
+# Symbolication / obfuscation
+app.*.symbols
+app.*.map.json
+
+# Android Studio build outputs
+/android/app/debug
+/android/app/profile
+/android/app/release
+
+# ================= Firebase =================
+.firebase/
+firebase-debug.log
+firestore-debug.log
+database-debug.log
+ui-debug.log
+
+# ================= IDE / editors =================
+*.iml
+*.ipr
+*.iws
+.idea/
+.vscode/
+*.code-workspace
+.cursor/
+
+# ================= Agent working files =================
+.zcode/
+
+# ================= Music upload sources (Binaries stay local) =================
+# MP3s dropped in music_upload/ are pushed to Supabase by
+# tool/upload_music.dart and must not be committed. The manifest
+# (tracks.json), README, and script ARE committed.
+music_upload/*.mp3
+music_upload/*.MP3
+
+# ===== ↑ 以上同步自 .gitignore（「从 .gitignore 同步」只重写以上部分）=====
+.git/
+.hg/
+node_modules/
+bower_components/
+jspm_packages/
+__pycache__/
+site-packages/
+venv/
+coverage/
+htmlcov/
+lcov-report/
+cmakefiles/
+cmake-build-*/
+bazel-*/
+pods/
+deriveddata/
+storybook-static/
+playwright-report/
+test-results/
+allure-results/
+allure-report/
+cdk.out/
+*.egg-info/
+*.dist-info/
+eggs/
+pip-wheel-metadata/
+wheels/
+# ----- ↑ 以上为 ZCode 默认排除规则（自定义规则请写在本行下方，不会被同步/恢复改动）-----
+# 自定义规则写在下方（本行提示可删除）

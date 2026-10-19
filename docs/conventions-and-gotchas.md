@@ -38,16 +38,19 @@ Learned the hard way — read before writing code or tests.
 - Text changes need BOTH `app_en.arb` AND `app_id.arb` + regen.
 
 ## Deploys
-- Canonical live site is **https://jentweb.web.app** (`.firebaserc`
-  default + workflow `projectId`). `me-jent.web.app` is a legacy
-  manual deployment kept only for the old domain — never test on it,
-  it can be many features behind.
+- Canonical live site is the **Dokploy VPS** (GitHub Actions builds
+  the bundle → `ghcr.io/fritzent/jent_web:latest` → webhook redeploys;
+  see `workflows.md`). `https://jentweb.web.app` is a FROZEN fallback
+  (its workflow is manual-only) and `me-jent.web.app` is legacy —
+  both can be many features behind, never test against them.
 - Suspect a stale build? Compare a table name from
   `lib/data/datasources/` against the served bundle:
-  `curl -s https://jentweb.web.app/main.dart.js | grep -c music_tracks`
+  `curl -s http://<vps-host>/main.dart.js | grep -c music_tracks`
   (`0` = the deployed build predates the Supabase music feature).
-- Firebase hosts the Flutter **service worker**, so a stale bundle can
-  survive a deploy; hard-reload when verifying a new build.
+- nginx sends `Cache-Control: no-cache` on everything (Flutter web
+  file names are not content-hashed), so HTTP-cache staleness is off
+  the table — but the Flutter **service worker** still caches in the
+  browser; hard-reload when verifying a new build.
 
 ## Tests (flutter_test + bloc_test + mocktail)
 - After `bloc.add(...)`, pump TWICE (`pump()` + `pump(duration)`)

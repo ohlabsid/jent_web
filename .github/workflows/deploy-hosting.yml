@@ -1,8 +1,11 @@
-name: Deploy Hosting + Notify Discord
+name: Firebase Hosting — manual fallback
+
+# MANUAL ONLY since the Dokploy migration (deploy-dokploy.yml now
+# handles every push to main). jentweb.web.app stays frozen at the
+# last deploy; run this workflow by hand from the Actions tab only
+# if the VPS is down and Firebase needs to take over again.
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 jobs:

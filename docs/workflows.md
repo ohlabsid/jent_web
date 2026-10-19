@@ -38,26 +38,49 @@ flutter gen-l10n
 `flutter gen-l10n` reads `l10n.yaml`; template file is `app_id.arb`
 — add keys to BOTH `app_en.arb` and `app_id.arb` first.
 
-## Release deploy (Firebase Hosting, project `jentweb`)
+## Release deploy (Dokploy on the VPS)
 ```sh
 flutter build web --release --base-href / --dart-define=... (same three)
-firebase deploy --only hosting --project jentweb
+docker build -t jent_web .      # nginx + build/web, see Dockerfile
+docker run -p 8080:80 jent_web  # local smoke check of the same image
 ```
-Live at `https://jentweb.web.app`. CI (`.github/workflows/`) does the
-same: it reads these repo secrets and injects them as `--dart-define`s
-via `env` (quoted, so special characters are safe):
+CI (`.github/workflows/deploy-dokploy.yml`) does this on every push to
+main: builds the bundle from the repo secrets, pushes
+`ghcr.io/fritzent/jent_web:{latest,<sha>}`, then curls the Dokploy
+webhook so the VPS re-pulls `latest`. The VPS never builds anything —
+no Flutter SDK, no RAM pressure, secrets stay in GitHub.
 
-| Repo secret | Maps to define |
+| Repo secret | Used for |
 |---|---|
-| `SUPABASE_URL` | `SUPABASE_URL` (notes + music catalog) |
-| `SUPABASE_ANON_KEY` | `SUPABASE_ANON_KEY` |
-| `WEB3FORMS_KEY` | `WEB3FORMS_KEY` (contact form) |
+| `SUPABASE_URL` | `--dart-define=SUPABASE_URL` (notes + music catalog) |
+| `SUPABASE_ANON_KEY` | `--dart-define=SUPABASE_ANON_KEY` |
+| `WEB3FORMS_KEY` | `--dart-define=WEB3FORMS_KEY` (contact form) |
+| `DOKPLOY_WEBHOOK_URL` | redeploy trigger (app > General: Auto Deploy on; webhook URL is in the Deployments tab) |
+| `DISCORD_WEBHOOK_URL` | success/failure notifications |
 
-A secret that is missing expands to an empty define and the app
-degrades gracefully (see `backend-and-secrets.md`). Add/rotate them
-under Settings > Secrets and variables > Actions. Deploys also need
-`FIREBASE_SERVICE_ACCOUNT_ME_JENT` (project `jentweb`) and use
-`DISCORD_WEBHOOK_URL` for notifications.
+The GHCR package is private; Dokploy pulls it through a PAT with
+`read:packages` stored in Dokploy's registry settings. A missing
+secret expands to an empty define and the app degrades gracefully
+(see `backend-and-secrets.md`). Add/rotate secrets under
+Settings > Secrets and variables > Actions.
+
+### First-time Dokploy setup (web UI)
+1. Projects → Create (`jentweb`) → Create Resource → Application,
+   source **Docker Image**, image `ghcr.io/fritzent/jent_web:latest`,
+   port **80**. The package must be public, or add a `read:packages`
+   PAT under Dokploy → Settings → Registry.
+2. App → Domains → generate a free `traefik.me` domain (or attach a
+   custom one — Let's Encrypt is automatic). Domain-less alternative:
+   expose a port under Advanced Settings → Ports.
+3. App → General → toggle Auto Deploy on; Deployments tab → copy the
+   webhook URL → repo secret `DOKPLOY_WEBHOOK_URL`. Push to main and
+   the whole pipeline runs.
+
+## Firebase fallback (manual only)
+`.github/workflows/deploy-hosting.yml` no longer runs on push: trigger
+it by hand from the Actions tab to republish `https://jentweb.web.app`
+(needs `FIREBASE_SERVICE_ACCOUNT_ME_JENT`). Until then that site stays
+frozen at the last deploy.
 
 ## Music upload (Supabase `music` bucket + catalog rows)
 ```sh

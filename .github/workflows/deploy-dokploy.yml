@@ -1,0 +1,134 @@
+name: Deploy to Dokploy (VPS) + Notify Discord
+
+# Pipeline: GitHub builds the Flutter web bundle with the repo's
+# secrets, packages it into an nginx image (see Dockerfile), pushes
+# it to GHCR, then fires the Dokploy webhook so the VPS re-pulls
+# `latest` and redeploys. The VPS never builds anything.
+#
+# Repo secrets used (Settings > Secrets and variables > Actions):
+#   SUPABASE_URL, SUPABASE_ANON_KEY, WEB3FORMS_KEY  (compiled in)
+#   DOKPLOY_WEBHOOK_URL                             (redeploy trigger)
+# The Firebase workflow (deploy-hosting.yml) is the manual fallback.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  IMAGE: ghcr.io/fritzent/jent_web
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-push-deploy-notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: "3.44.8"
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build web
+        # Same env-passing contract as the old Firebase workflow:
+        # quoted shell expansion keeps special characters safe, and a
+        # missing secret degrades gracefully inside the app (demo
+        # catalog, error states) instead of failing the build.
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          WEB3FORMS_KEY: ${{ secrets.WEB3FORMS_KEY }}
+        run: |
+          flutter build web --release --base-href / \
+            --dart-define=SUPABASE_URL="$SUPABASE_URL" \
+            --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" \
+            --dart-define=WEB3FORMS_KEY="$WEB3FORMS_KEY"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:latest
+            ${{ env.IMAGE }}:${{ github.sha }}
+
+      - name: Trigger Dokploy redeploy
+        # Dokploy: app > General tab > enable Auto Deploy, then copy
+        # the Webhook URL from the Deployments tab into the
+        # DOKPLOY_WEBHOOK_URL repo secret. Failing loudly on a
+        # missing/misfiring webhook is intentional: the image is
+        # safely in GHCR, but the VPS would stay on the old one.
+        env:
+          DOKPLOY_WEBHOOK_URL: ${{ secrets.DOKPLOY_WEBHOOK_URL }}
+        run: |
+          if [ -z "$DOKPLOY_WEBHOOK_URL" ]; then
+            echo "::error::DOKPLOY_WEBHOOK_URL is not set — add it under Settings > Secrets and variables > Actions (Dokploy app > Settings > Webhooks)."
+            exit 1
+          fi
+          curl -fsS --max-time 60 "$DOKPLOY_WEBHOOK_URL"
+
+      - name: Notify Discord — success
+        if: success()
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          if [ -z "$DISCORD_WEBHOOK_URL" ]; then
+            echo "DISCORD_WEBHOOK_URL not set — skipping notification."
+            exit 0
+          fi
+          curl -sS -H "Content-Type: application/json" -d "{
+            \"embeds\": [{
+              \"title\": \"✅ Deployed to Dokploy — jentweb\",
+              \"url\": \"https://github.com/Fritzent/jent_web/pkgs/container/jent_web\",
+              \"color\": 5763719,
+              \"description\": \"New image pushed to GHCR and Dokploy webhook fired.\",
+              \"fields\": [
+                {\"name\": \"Image\", \"value\": \"ghcr.io/fritzent/jent_web:${GITHUB_SHA::7}\", \"inline\": false},
+                {\"name\": \"Commit\", \"value\": \"${GITHUB_SHA::7} by ${GITHUB_ACTOR}\", \"inline\": true},
+                {\"name\": \"Branch\", \"value\": \"${GITHUB_REF_NAME}\", \"inline\": true}
+              ],
+              \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"
+            }]
+          }" "$DISCORD_WEBHOOK_URL"
+
+      - name: Notify Discord — failure
+        if: failure()
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          if [ -z "$DISCORD_WEBHOOK_URL" ]; then
+            echo "DISCORD_WEBHOOK_URL not set — skipping notification."
+            exit 0
+          fi
+          curl -sS -H "Content-Type: application/json" -d "{
+            \"embeds\": [{
+              \"title\": \"❌ Dokploy deploy FAILED — jentweb\",
+              \"url\": \"https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\",
+              \"color\": 15548997,
+              \"description\": \"The build, push, or webhook step failed. Check the Actions run.\",
+              \"fields\": [
+                {\"name\": \"Commit\", \"value\": \"${GITHUB_SHA::7} by ${GITHUB_ACTOR}\", \"inline\": true},
+                {\"name\": \"Branch\", \"value\": \"${GITHUB_REF_NAME}\", \"inline\": true},
+                {\"name\": \"Run\", \"value\": \"https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\", \"inline\": false}
+              ],
+              \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"
+            }]
+          }" "$DISCORD_WEBHOOK_URL"
