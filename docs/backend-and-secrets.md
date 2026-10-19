@@ -28,6 +28,46 @@ state, music keeps the bundled demo catalog (streaming needs network).
   SMTP sockets, so this path can never run on web.
 - Deploy needs `WEB3FORMS_KEY` in the build (see `workflows.md`).
 
+### hCaptcha spam protection (web only)
+
+Enabled in the Web3Forms dashboard (Block Spam = hCaptcha). The solved
+token rides along as `h-captcha-response`; without it Web3Forms
+rejects the submission, so **Send stays disabled until the visitor
+solves the challenge**.
+
+Web3Forms' zero-config snippet (`<div class="h-captcha">` inside a
+`<form>` + `web3forms.com/client/script.js`) **cannot work here**:
+Flutter Web paints to a canvas, so there is no HTML `<form>` for the
+script to attach to. Instead `features/mail/captcha/hcaptcha_web.dart`
+hosts a real `<div>` through Flutter's platform-view API
+(`HtmlElementView` + `dart:ui_web.platformViewRegistry`) and calls the
+hCaptcha JS API directly:
+
+- `web/index.html` loads `js.hcaptcha.com/1/api.js?render=explicit` —
+  `render=explicit` stops the script auto-mounting and exposes
+  `window.hcaptcha` for Dart to call.
+- Site key is Web3Forms' shared free-plan key (`50b2fe65-…`, public
+  by design). Paid plans can override it with
+  `--dart-define=HCAPTCHA_SITE_KEY=...`.
+- `reCaptchaCompat: false` is **required** — Web3Forms only accepts
+  tokens from the native hCaptcha widget.
+- The challenge resets right after submit (tokens are single-use and
+  expire in ~2 min) and on `expired-callback`, so a failed send shows
+  a fresh checkbox.
+- Options use `JSObject()` + `setProperty` because hCaptcha has
+  kebab-case keys (`expired-callback`) that Dart named parameters
+  cannot express. `js_interop_unsafe` (`getProperty`/`callMethod`)
+  instead of `dart:js_util`, which is web-only and trips a lint.
+- Native builds get `hcaptcha_stub.dart` (no captcha — SMTP is used
+  there) via the same conditional-import pattern as the Spotify player.
+  Widget tests therefore run against the stub; the real path is
+  verified by the integration journey (`flutter drive`), which asserts
+  the platform view mounts on web.
+- `registerViewFactory` MUST run before the `HtmlElementView` mounts.
+  Registering inside `onPlatformViewCreated` is too late and throws
+  `PlatformException(unregistered_view_type)`. The factory closure
+  returns the same element hCaptcha renders into.
+
 ## Supabase (`notes` table)
 ```sql
 create table notes (

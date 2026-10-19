@@ -60,6 +60,7 @@ class MailBloc extends Bloc<MailEvent, MailState> {
           from: event.from,
           subject: event.subject,
           body: event.body,
+          captchaToken: event.captchaToken,
         ),
       );
       emit(state.copyWith(emailStatus: EmailStatus.sent));

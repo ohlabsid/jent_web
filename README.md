@@ -11,7 +11,7 @@ But every icon is alive:
 
 | Dock icon | What it really is |
 |---|---|
-| 📧 Email | A working contact form → lands in my inbox (Web3Forms) |
+| 📧 Email | A working contact form → lands in my inbox (Web3Forms, hCaptcha-protected) |
 | 📝 Notes | macOS Notes clone — folders, search, live editing, synced to Supabase |
 | 🎵 Music | Floating player with my real Spotify playlist (+ offline fallback) |
 | 📸 Photos | PIN-locked gallery (`****`) with a public guest album for the curious |

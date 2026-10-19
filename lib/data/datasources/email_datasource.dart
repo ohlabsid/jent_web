@@ -1,7 +1,6 @@
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
+import 'package:flutter/foundation.dart';import 'package:http/http.dart' as http;
 import 'package:injectable/injectable.dart';
 import 'package:jent_web/domain/entities/email_message.dart';
 import 'package:mailer/mailer.dart' as mailer;
@@ -49,6 +48,10 @@ class EmailDatasource {
 
   /// Web delivery via Web3Forms. The visitor's address is sent as the
   /// `email` field so your inbox shows it as the reply-to address.
+  ///
+  /// [EmailMessage.captchaToken] is sent as `h-captcha-response` when
+  /// present: with hCaptcha enabled as the spam protection, Web3Forms
+  /// rejects submissions that arrive without a valid token.
   Future<void> _sendViaWeb3Forms(EmailMessage message) async {
     if (_web3formsKey.isEmpty) {
       throw StateError(
@@ -62,13 +65,7 @@ class EmailDatasource {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
       },
-      body: jsonEncode({
-        'access_key': _web3formsKey,
-        'name': message.name,
-        'email': message.from,
-        'subject': message.subject.isEmpty ? '(no subject)' : message.subject,
-        'message': 'From: ${message.name} <${message.from}>\n\n${message.body}',
-      }),
+      body: jsonEncode(web3FormsPayload(message)),
     );
     if (response.statusCode != 200 ||
         !response.body.contains('"success":true')) {
@@ -76,5 +73,21 @@ class EmailDatasource {
         'Email delivery failed (HTTP ${response.statusCode}): ${response.body}',
       );
     }
+  }
+
+  /// Body for the Web3Forms POST. Public (and free of secrets beyond the
+  /// access key) so tests can assert the captcha field without network.
+  @visibleForTesting
+  Map<String, dynamic> web3FormsPayload(EmailMessage message) {
+    final token = message.captchaToken;
+    return {
+      'access_key': _web3formsKey,
+      'name': message.name,
+      'email': message.from,
+      'subject': message.subject.isEmpty ? '(no subject)' : message.subject,
+      'message':
+          'From: ${message.name} <${message.from}>\n\n${message.body}',
+      if (token != null && token.isNotEmpty) 'h-captcha-response': token,
+    };
   }
 }

@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:jent_web/core/theme/app_colors.dart';
 import 'package:jent_web/core/theme/app_dimens.dart';
 import 'package:jent_web/core/widgets/window/window_title_bar.dart';
+import 'package:jent_web/features/mail/captcha/hcaptcha.dart';
 import 'package:jent_web/l10n/app_localizations.dart';
 import 'package:jent_web/features/mail/bloc/mail_bloc.dart';
 import 'package:jent_web/features/mail/bloc/mail_state.dart';
@@ -36,11 +37,15 @@ class MailDraft {
   final String subject;
   final String body;
 
+  /// hCaptcha token, or null where the form has no captcha (native).
+  final String? captchaToken;
+
   const MailDraft({
     required this.name,
     required this.from,
     required this.subject,
     required this.body,
+    this.captchaToken,
   });
 
   bool get canSend =>
@@ -53,11 +58,15 @@ class _MailWindowState extends State<MailWindow> {
   final _subjectController = TextEditingController();
   final _bodyController = TextEditingController();
 
+  /// Real hCaptcha on web, no-op on native (SMTP needs no captcha).
+  final HCaptcha _captcha = createHCaptcha();
+
   MailDraft get _draft => MailDraft(
         name: _nameController.text,
         from: _fromController.text,
         subject: _subjectController.text,
         body: _bodyController.text,
+        captchaToken: _captcha.token,
       );
 
   @override
@@ -86,6 +95,10 @@ class _MailWindowState extends State<MailWindow> {
     final draft = _draft;
     if (!draft.canSend) return;
     widget.onSend(draft);
+    // Tokens are single-use and expire quickly, so drop the solved
+    // challenge right after handing it over: a failed send then shows
+    // a fresh checkbox instead of a silently rejected token.
+    _captcha.reset();
   }
 
   @override
@@ -94,7 +107,10 @@ class _MailWindowState extends State<MailWindow> {
     final emailStatus =
         context.select<MailBloc, EmailStatus>((b) => b.state.emailStatus);
     final sending = emailStatus == EmailStatus.sending;
-    final canSend = _draft.canSend && !sending;
+    // With spam protection on, Web3Forms rejects untokened submissions,
+    // so Send stays disabled until the challenge is solved.
+    final captchaSolved = !_captcha.isSupported || _captcha.token != null;
+    final canSend = _draft.canSend && captchaSolved && !sending;
 
     return Material(
       elevation: 24,
@@ -147,6 +163,20 @@ class _MailWindowState extends State<MailWindow> {
                 ),
               ),
             ),
+            if (_captcha.isSupported)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: SizedBox(
+                    width: 303,
+                    height: 78,
+                    child: _captcha.buildWidget(
+                      onToken: (_) => setState(() {}),
+                    ),
+                  ),
+                ),
+              ),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
               child: Row(

@@ -207,6 +207,7 @@ class _MailOverlayState extends State<MailOverlay> {
                                             from: draft.from,
                                             subject: draft.subject,
                                             body: draft.body,
+                                            captchaToken: draft.captchaToken,
                                           ),
                                         ),
                               ),

@@ -145,6 +145,37 @@ void main() {
     );
 
     blocTest<MailBloc, MailState>(
+      'forwards the hCaptcha token to the repository',
+      build: () {
+        when(() => sendEmail(any())).thenAnswer((_) async {});
+        return buildBloc();
+      },
+      act: (bloc) => bloc.add(
+        SendEmail(
+          name: event.name,
+          from: event.from,
+          subject: event.subject,
+          body: event.body,
+          captchaToken: 'token-abc',
+        ),
+      ),
+      expect: () => [
+        isA<MailState>()
+            .having((s) => s.emailStatus, 'status', EmailStatus.sending),
+        isA<MailState>()
+            .having((s) => s.emailStatus, 'status', EmailStatus.sent),
+      ],
+      verify: (_) => verify(
+        () => sendEmail(
+          any(
+            that: isA<EmailMessage>()
+                .having((m) => m.captchaToken, 'captchaToken', 'token-abc'),
+          ),
+        ),
+      ).called(1),
+    );
+
+    blocTest<MailBloc, MailState>(
       'emits sending then error on failure',
       build: () {
         when(() => sendEmail(any())).thenThrow(Exception('smtp'));

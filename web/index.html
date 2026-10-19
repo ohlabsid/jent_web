@@ -41,6 +41,10 @@
     };
   </script>
   <script src="https://sdk.scdn.co/spotify-player.js" async></script>
+  <!-- hCaptcha for Web3Forms spam protection. `render=explicit` keeps the
+       script from auto-mounting so the Flutter web client can call
+       window.hcaptcha.render() into its own platform view. -->
+  <script src="https://js.hcaptcha.com/1/api.js?render=explicit" async defer></script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

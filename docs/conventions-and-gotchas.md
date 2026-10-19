@@ -26,6 +26,15 @@ Learned the hard way — read before writing code or tests.
   "empty backend" (demo music catalog, seed notes). When a backend
   feature seems dead, check the Network tab for the REST call before
   touching code.
+- Flutter Web has **no HTML DOM for your widgets** — CanvasKit paints
+  everything. Third-party JS widgets (hCaptcha) therefore need a real
+  `<div>` hosted via `HtmlElementView` + `platformViewRegistry`; a
+  `<div class="...">` + script-tag "drop-in" silently does nothing.
+  JS options with kebab-case keys need `JSObject()` + `setProperty`,
+  and `dart:js_util` is web-only (lint) — use `js_interop_unsafe`.
+- Keep the platform view type stable per controller instance
+  (`hcaptcha-${counter++}`) and register the factory once, or every
+  rebuild recreates the view and duplicate registration throws.
 - Text changes need BOTH `app_en.arb` AND `app_id.arb` + regen.
 
 ## Deploys

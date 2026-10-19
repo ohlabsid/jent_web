@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
@@ -90,6 +91,11 @@ void main() {
         (w) => w is TrafficLightButton && w.color == const Color(0xFFFF5F57),
       );
 
+  Finder sendButton() => find.descendant(
+        of: find.byType(MailWindow),
+        matching: find.byType(TextButton),
+      );
+
   testWidgets('mail: compose, fail gracefully, close', (tester) async {
     await reachHome(tester);
 
@@ -101,13 +107,20 @@ void main() {
     // Subject is the third field (name, from, subject).
     await tester.enterText(find.byType(TextField).at(2), 'Hello');
     await tester.enterText(find.byType(TextField).at(3), 'Body text');
-    await tester.tap(find.descendant(
-      of: find.byType(MailWindow),
-      matching: find.byType(TextButton),
-    ));
-    // No Web3Forms key in tests: the error card shows, no crash.
-    await waitFor(tester, find.byKey(const ValueKey('error')));
-    expect(find.byKey(const ValueKey('error')), findsOneWidget);
+
+    if (kIsWeb) {
+      // Spam protection is web-only: Web3Forms needs an hCaptcha token,
+      // so the challenge is hosted in the DOM and Send stays disabled
+      // until a real visitor solves it (bots can't).
+      await waitFor(tester, find.byType(HtmlElementView));
+      expect(find.byType(HtmlElementView), findsOneWidget);
+      expect(tester.widget<TextButton>(sendButton()).onPressed, isNull);
+    } else {
+      await tester.tap(sendButton());
+      // No Web3Forms key in tests: the error card shows, no crash.
+      await waitFor(tester, find.byKey(const ValueKey('error')));
+      expect(find.byKey(const ValueKey('error')), findsOneWidget);
+    }
 
     // Close via the red traffic light.
     await tester.tap(redLight());

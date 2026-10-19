@@ -17,7 +17,11 @@ Window flags: open/close/minimize/expand + `EmailStatus`
 (idle/sending/sent/error). `MailOverlay` mounts/unmounts on
 `isShowWindow` with scale animation. Submit → use case → SMTP on
 native, Web3Forms POST on web (see `backend-and-secrets.md`).
-Dock dot = open OR minimized; dock tap toggles close/open.
+On web the form also carries an hCaptcha challenge
+(`features/mail/captcha/`): Send stays disabled until it is solved,
+and the solved token travels `MailWindow → MailDraft → SendEmail →
+EmailMessage.captchaToken → h-captcha-response`. Dock dot = open OR
+minimized; dock tap toggles close/open.
 
 ## music (`MusicBloc`, needs `MusicAudioService`,
 ## `MusicRemoteDataSource`)
