@@ -55,7 +55,8 @@ Learned the hard way — read before writing code or tests.
   the second settles them. Single-pump asserts read stale sizes.
 - Quiesce timers before teardown or the test fails with "Timer is
   still pending": `CloseMusicPlayer` (sim timer), 1s pump (notes
-  800ms debounce), music `ToggleMusicPlayback` off.
+  800ms debounce), music `ToggleMusicPlayback` off, and the mail
+  window's 2s sent-banner timer (cancel it in `dispose`).
 - Hidden PIN fields (`Opacity 0`) still accept `enterText`.
 - `tester.drag` on a resize handle: deltas accumulate, then pump
   twice to measure.

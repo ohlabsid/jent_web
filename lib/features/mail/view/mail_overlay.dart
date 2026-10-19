@@ -146,13 +146,6 @@ class _MailOverlayState extends State<MailOverlay> {
             if (mounted) setState(() => _mounted = false);
           });
         }
-        if (state.emailStatus == EmailStatus.sent) {
-          Future.delayed(const Duration(milliseconds: 1200), () {
-            if (context.mounted) {
-              context.read<MailBloc>().add(ToggleCloseEmailMenu());
-            }
-          });
-        }
         if (_frame.value != null) {
           _frame.value = _clampFrame(_frame.value!, _screenSize!);
         }

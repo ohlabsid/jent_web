@@ -15,15 +15,21 @@ class MailBloc extends Bloc<MailEvent, MailState> {
     on<ToggleMinimizeEmailMenu>(_onToggleMinimizeEmailMenu);
     on<ToggleExpandEmailMenu>(_onToggleExpandEmailMenu);
     on<SendEmail>(_onSendEmail);
+    on<ResetEmailStatus>(_onResetEmailStatus);
   }
 
-  void _onToggleEmailMenu(
-    ToggleOpenEmailMenu event,
-    Emitter<MailState> emit,
-  ) {
+  void _onToggleEmailMenu(ToggleOpenEmailMenu event, Emitter<MailState> emit) {
     if (state.isShowWindow) return;
 
-    emit(state.copyWith(isShowWindow: true, isMinimizedWindow: false));
+    // Always start from a clean slate: a "Sent" banner from the last
+    // message must never greet the next visitor to open the window.
+    emit(
+      state.copyWith(
+        isShowWindow: true,
+        isMinimizedWindow: false,
+        emailStatus: EmailStatus.idle,
+      ),
+    );
   }
 
   void _onToggleCloseEmailMenu(
@@ -32,7 +38,13 @@ class MailBloc extends Bloc<MailEvent, MailState> {
   ) {
     if (!state.isShowWindow) return;
 
-    emit(state.copyWith(isShowWindow: false, isMinimizedWindow: false));
+    emit(
+      state.copyWith(
+        isShowWindow: false,
+        isMinimizedWindow: false,
+        emailStatus: EmailStatus.idle,
+      ),
+    );
   }
 
   void _onToggleMinimizeEmailMenu(
@@ -67,5 +79,12 @@ class MailBloc extends Bloc<MailEvent, MailState> {
     } catch (_) {
       emit(state.copyWith(emailStatus: EmailStatus.error));
     }
+  }
+
+  void _onResetEmailStatus(ResetEmailStatus event, Emitter<MailState> emit) {
+    // Guard against resetting mid-flight: the request is still running.
+    if (state.emailStatus == EmailStatus.sending) return;
+    if (state.emailStatus == EmailStatus.idle) return;
+    emit(state.copyWith(emailStatus: EmailStatus.idle));
   }
 }

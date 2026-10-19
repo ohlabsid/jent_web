@@ -36,7 +36,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get textSendError => 'Failed to send, try again';
 
   @override
-  String get textSentWithIcon => 'Sent ✓';
+  String get textSentWithIcon => 'Sent';
+
+  @override
+  String get textCaptchaTitle => 'Spam protection';
+
+  @override
+  String get textCaptchaHint => 'Verify you\'re human';
+
+  @override
+  String get textCaptchaVerified => 'Verified';
 
   @override
   String get textFinder => 'Finder';

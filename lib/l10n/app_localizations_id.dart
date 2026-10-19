@@ -36,7 +36,16 @@ class AppLocalizationsId extends AppLocalizations {
   String get textSendError => 'Gagal mengirim, coba lagi';
 
   @override
-  String get textSentWithIcon => 'Terkirim ✓';
+  String get textSentWithIcon => 'Terkirim';
+
+  @override
+  String get textCaptchaTitle => 'Perlindungan spam';
+
+  @override
+  String get textCaptchaHint => 'Verifikasi bahwa Anda manusia';
+
+  @override
+  String get textCaptchaVerified => 'Terverifikasi';
 
   @override
   String get textFinder => 'Temuan';

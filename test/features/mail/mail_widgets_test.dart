@@ -162,7 +162,37 @@ void main() {
       await tester.pump(const Duration(milliseconds: 100));
 
       expect(bloc.state.emailStatus.name, 'sent');
-      expect(find.text('Sent ✓'), findsOneWidget);
+      expect(find.text('Sent'), findsOneWidget);
+    });
+
+    testWidgets('a sent message keeps the window open and resets itself', (
+      tester,
+    ) async {
+      var closed = 0;
+      final bloc = await pumpMailWindow(
+        tester,
+        onClose: () => closed++,
+        sendBehavior: () async {},
+      );
+
+      await tester.enterText(find.byType(TextField).at(2), 'Hello');
+      await tester.enterText(find.byType(TextField).at(3), 'Body text');
+      await tester.tap(find.widgetWithText(TextButton, 'Send'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      // Still open, draft cleared, ready for the next message.
+      expect(closed, 0, reason: 'a sent message must not close the window');
+      expect(find.byType(MailWindow), findsOneWidget);
+      expect(tester.widget<TextField>(find.byType(TextField).at(3)).controller!.text, isEmpty);
+
+      // The banner fades back to idle on its own.
+      await tester.pump(const Duration(milliseconds: 2100));
+      await tester.pump();
+      expect(bloc.state.emailStatus.name, 'idle');
+      // AnimatedSwitcher keeps the old label for its fade-out.
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.text('Sent'), findsNothing);
     });
 
     testWidgets('failed send shows the error state', (tester) async {

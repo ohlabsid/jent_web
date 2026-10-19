@@ -23,6 +23,19 @@ and the solved token travels `MailWindow → MailDraft → SendEmail →
 EmailMessage.captchaToken → h-captcha-response`. Dock dot = open OR
 minimized; dock tap toggles close/open.
 
+### Send lifecycle (no auto-close)
+A successful send keeps the window open: the draft is cleared, a green
+"Sent" banner shows, and 2s later `ResetEmailStatus` returns the state
+to idle. Opening **or** closing the window also resets `emailStatus`,
+so a finished banner can never greet the next visitor (the old flow
+auto-closed 1.2s after sending, which made the stale status look
+random). `ResetEmailStatus` ignores `sending`, so it can't cancel an
+in-flight request. The `_statusTimer` must be cancelled in `dispose`.
+
+The hCaptcha panel is a titled section above the Send row, echoing
+Mail's compose footer. It stacks below ~400px because the window
+resizes to 360px wide while the challenge is a fixed 303px.
+
 ## music (`MusicBloc`, needs `MusicAudioService`,
 ## `MusicRemoteDataSource`)
 Library window (macOS Music style): sidebar (Songs/Albums/Artists +

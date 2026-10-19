@@ -78,7 +78,8 @@ class HCaptchaWeb implements HCaptcha {
     // Required by Web3Forms: their token is only accepted from the
     // native hCaptcha widget, not the reCAPTCHA-compatible one.
     options.setProperty('reCaptchaCompat'.toJS, false.toJS);
-    options.setProperty('size'.toJS, 'compact'.toJS);
+    // Default ('normal') size matches the 303x78 box the mail window
+    // reserves; 'compact' renders a different box.
     options.setProperty('theme'.toJS, 'light'.toJS);
     options.setProperty(
       'callback'.toJS,

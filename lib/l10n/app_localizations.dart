@@ -155,8 +155,26 @@ abstract class AppLocalizations {
   /// No description provided for @textSentWithIcon.
   ///
   /// In id, this message translates to:
-  /// **'Terkirim ✓'**
+  /// **'Terkirim'**
   String get textSentWithIcon;
+
+  /// No description provided for @textCaptchaTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Perlindungan spam'**
+  String get textCaptchaTitle;
+
+  /// No description provided for @textCaptchaHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Verifikasi bahwa Anda manusia'**
+  String get textCaptchaHint;
+
+  /// No description provided for @textCaptchaVerified.
+  ///
+  /// In id, this message translates to:
+  /// **'Terverifikasi'**
+  String get textCaptchaVerified;
 
   /// No description provided for @textFinder.
   ///

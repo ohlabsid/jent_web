@@ -105,6 +105,54 @@ void main() {
     );
   });
 
+  group('status lifecycle', () {
+    test('a sent banner never survives into the next window open', () async {
+      when(() => sendEmail(any())).thenAnswer((_) async {});
+      final bloc = buildBloc();
+      addTearDown(bloc.close);
+
+      bloc.add(ToggleOpenEmailMenu());
+      await bloc.stream.firstWhere((s) => s.isShowWindow);
+
+      bloc.add(
+        SendEmail(
+          name: 'Ada',
+          from: 'ada@mail.com',
+          subject: 'Hi',
+          body: 'Hello',
+        ),
+      );
+      await bloc.stream.firstWhere(
+        (s) => s.emailStatus == EmailStatus.sent,
+      );
+
+      // Close, then open again: the stale "Sent" must be gone.
+      bloc.add(ToggleCloseEmailMenu());
+      await bloc.stream.firstWhere((s) => !s.isShowWindow);
+      expect(bloc.state.emailStatus, EmailStatus.idle);
+
+      bloc.add(ToggleOpenEmailMenu());
+      await bloc.stream.firstWhere((s) => s.isShowWindow);
+      expect(bloc.state.emailStatus, EmailStatus.idle);
+    });
+
+    blocTest<MailBloc, MailState>(
+      'reset clears a finished banner but never interrupts a send',
+      build: () {
+        when(() => sendEmail(any())).thenAnswer((_) async {});
+        return buildBloc();
+      },
+      act: (bloc) => bloc
+        ..add(ToggleOpenEmailMenu())
+        ..add(ResetEmailStatus()),
+      expect: () => [
+        // Only the open toggles the window; idle status is not re-emitted.
+        isA<MailState>().having((s) => s.isShowWindow, 'shown', true),
+      ],
+      verify: (_) => expect(buildBloc().state.emailStatus, EmailStatus.idle),
+    );
+  });
+
   group('send email', () {
     const event = (
       name: 'Ada',
