@@ -4,10 +4,12 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jent_web/l10n/app_localizations.dart';
 import 'package:jent_web/data/datasources/notes_remote_datasource.dart';
+import 'package:jent_web/domain/entities/note_item.dart';
 import 'package:jent_web/features/notes/bloc/notes_bloc.dart';
 import 'package:jent_web/features/notes/bloc/notes_event.dart';
 import 'package:jent_web/features/notes/view/notes_overlay.dart';
 import 'package:jent_web/features/notes/view/notes_pin_overlay.dart';
+import 'package:mocktail/mocktail.dart';
 
 
 /// The expanding multiline editor (the search field is single-line).
@@ -15,9 +17,26 @@ Finder editorField() => find.byWidgetPredicate(
       (w) => w is TextField && w.expands,
     );
 
+/// Records every write instead of hitting the network, so the
+/// debounced save can be asserted offline.
+class _RecordingNotesRemote extends Mock implements NotesRemoteDataSource {}
+
+/// Needed by mocktail's `any()` for the [NoteItem] argument.
+final _dummyNote = NoteItem(
+  id: 'dummy',
+  folder: 'notes',
+  body: '',
+  updatedAt: DateTime(2026),
+);
+
 void main() {
-  Future<NotesBloc> pumpNotes(WidgetTester tester) async {
-    final bloc = NotesBloc(NotesRemoteDataSource());
+  setUpAll(() => registerFallbackValue(_dummyNote));
+
+  Future<NotesBloc> pumpNotes(
+    WidgetTester tester, [
+    NotesRemoteDataSource? remote,
+  ]) async {
+    final bloc = NotesBloc(remote ?? NotesRemoteDataSource());
     addTearDown(bloc.close);
 
     await tester.pumpWidget(
@@ -82,8 +101,43 @@ void main() {
     await tester.pump(const Duration(seconds: 1));
   });
 
-  testWidgets('window can be resized from the right edge', (tester) async {
-    await unlockNotes(tester, await pumpNotes(tester));
+  testWidgets('a new general note and its body are written to the remote',
+      (tester) async {
+    final remote = _RecordingNotesRemote();
+    final saved = <NoteItem>[];
+    when(() => remote.saveNote(any())).thenAnswer((invocation) async {
+      saved.add(invocation.positionalArguments.first as NoteItem);
+      return true;
+    });
+    when(() => remote.fetchNotes()).thenAnswer((_) async => null);
+
+    final bloc = await pumpNotes(tester, remote);
+    await unlockNotes(tester, bloc);
+
+    // Owner files the note into General (what wrong-PIN guests read).
+    await tester.tap(find.text('General'));
+    await tester.pump();
+    await tester.tap(find.byTooltip('New Note'));
+    await tester.pump();
+
+    // Create syncs immediately, even before any text is typed.
+    expect(saved, hasLength(1));
+    expect(saved.single.folder, 'general');
+    final createdId = saved.single.id;
+
+    await tester.enterText(editorField(), 'Grocery run\nbuy oat milk');
+    await tester.pump();
+
+    // Typing is debounced, so nothing is written yet.
+    expect(saved, hasLength(1));
+
+    await tester.pump(const Duration(seconds: 1));
+
+    final bodyWrite = saved.lastWhere((n) => n.id == createdId);
+    expect(bodyWrite.body, 'Grocery run\nbuy oat milk');
+  });
+
+  testWidgets('window can be resized from the right edge', (tester) async {    await unlockNotes(tester, await pumpNotes(tester));
 
     Size windowSize() => tester.getSize(find.byType(AnimatedContainer).first);
     expect(windowSize(), const Size(720, 480));

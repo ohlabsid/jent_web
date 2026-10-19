@@ -18,7 +18,27 @@ Learned the hard way — read before writing code or tests.
   order in `features.md`).
 - `BlocSelector` with a `List` result rebuilds on EVERY emit (identity
   equality) — use records or `context.select` instead.
+- **postgrest-dart `order()` defaults to DESCENDING** (opposite of SQL
+  and of postgrest-js). Always pass `ascending: true` where you mean
+  ascending, or playlists play backwards / lists render newest-first.
+- Supabase calls swallow failures: the datasources return `null`/`false`
+  instead of throwing, so a broken define or bad RLS looks exactly like
+  "empty backend" (demo music catalog, seed notes). When a backend
+  feature seems dead, check the Network tab for the REST call before
+  touching code.
 - Text changes need BOTH `app_en.arb` AND `app_id.arb` + regen.
+
+## Deploys
+- Canonical live site is **https://jentweb.web.app** (`.firebaserc`
+  default + workflow `projectId`). `me-jent.web.app` is a legacy
+  manual deployment kept only for the old domain — never test on it,
+  it can be many features behind.
+- Suspect a stale build? Compare a table name from
+  `lib/data/datasources/` against the served bundle:
+  `curl -s https://jentweb.web.app/main.dart.js | grep -c music_tracks`
+  (`0` = the deployed build predates the Supabase music feature).
+- Firebase hosts the Flutter **service worker**, so a stale bundle can
+  survive a deploy; hard-reload when verifying a new build.
 
 ## Tests (flutter_test + bloc_test + mocktail)
 - After `bloc.add(...)`, pump TWICE (`pump()` + `pump(duration)`)

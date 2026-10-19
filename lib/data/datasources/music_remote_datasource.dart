@@ -79,8 +79,9 @@ class MusicRemoteDataSource {
     }
   }
 
-  /// Returns remote tracks in `sort_order`, with `audio_path`
-  /// resolved to a public storage URL, or `null` when unavailable.
+  /// Returns remote tracks ascending by `sort_order` (then
+  /// `created_at`), with `audio_path` resolved to a public storage
+  /// URL, or `null` when unavailable.
   Future<List<MusicTrack>?> fetchTracks() async {
     final client = _client;
     if (client == null) return null;
@@ -88,8 +89,8 @@ class MusicRemoteDataSource {
       final rows = await client
           .from(tracksTable)
           .select()
-          .order('sort_order')
-          .order('created_at');
+          .order('sort_order', ascending: true)
+          .order('created_at', ascending: true);
       return (rows as List).map((row) {
         final map = Map<String, dynamic>.from(row as Map);
         final path = (map['audio_path'] ?? '').toString();
@@ -102,8 +103,8 @@ class MusicRemoteDataSource {
     }
   }
 
-  /// Returns playlists (each with its ordered track ids) in
-  /// `sort_order`, or `null` when unavailable.
+  /// Returns playlists ascending by `sort_order` (each with its
+  /// track ids ascending by `position`), or `null` when unavailable.
   Future<List<(MusicPlaylistInfo, List<String>)>?> fetchPlaylists() async {
     final client = _client;
     if (client == null) return null;
@@ -111,10 +112,14 @@ class MusicRemoteDataSource {
       final playlistRows = await client
           .from(playlistsTable)
           .select()
-          .order('sort_order')
-          .order('created_at');
-      final junctionRows =
-          await client.from(junctionTable).select().order('position');
+          .order('sort_order', ascending: true)
+          .order('created_at', ascending: true);
+      final junctionRows = await client
+          .from(junctionTable)
+          .select()
+          // Ascending on purpose: postgrest-dart's `order()` defaults to
+          // DESCENDING, which would play every playlist backwards.
+          .order('position', ascending: true);
       final byPlaylist = <String, List<String>>{};
       for (final row in junctionRows as List) {
         final map = Map<String, dynamic>.from(row as Map);

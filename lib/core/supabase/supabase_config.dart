@@ -18,6 +18,6 @@ class SupabaseConfig {
   /// are missing so the app keeps working fully offline.
   static Future<void> initialize() async {
     if (!isConfigured) return;
-    await Supabase.initialize(url: url, anonKey: anonKey);
+    await Supabase.initialize(url: url, publishableKey: anonKey);
   }
 }

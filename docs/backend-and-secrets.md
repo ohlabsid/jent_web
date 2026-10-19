@@ -96,9 +96,41 @@ unconfigured/offline; `MusicBloc` keeps the demo catalog then).
 Unlike notes, music is **read-only** from the app — no anon
 insert/update/delete policies, so uploads and row edits stay
 dashboard-side (owner login). Sidebar playlists come from
-`music_playlists` + `music_playlist_tracks(track_id, position)`.
+`music_playlists` + `music_playlist_tracks(track_id, position)`, both
+ordered **ascending** — `order()` defaults to DESC in postgrest-dart,
+which silently plays every playlist backwards.
 
 To publish songs without touching the dashboard SQL: drop MP3s in
 `music_upload/`, fill `tracks.json`, and run
 `tool/upload_music.dart` (needs `SUPABASE_SERVICE_ROLE_KEY`;
 see `music_upload/README.md` and `docs/workflows.md`).
+
+## Checking the connection
+
+Backend health (anon key is public, so this is safe to run):
+
+```sh
+K=<publishable key>; U=https://<ref>.supabase.co
+curl -s "$U/rest/v1/notes?select=id&limit=1" \
+  -H "apikey: $K" -H "Authorization: Bearer $K"          # 200 + rows
+curl -s "$U/rest/v1/music_tracks?select=id&limit=1" \
+  -H "apikey: $K" -H "Authorization: Bearer $K"
+```
+
+Is the **served build** configured? Defines are compiled in, so the
+URL is greppable in the deployed JS:
+
+```sh
+curl -s https://<site>/main.dart.js | grep -c "supabase.co"
+curl -s https://<site>/main.dart.js | grep -c "music_tracks"  # 0 = stale build
+```
+
+Is the **client** talking? Open the site, DevTools → Network, filter
+`supabase`, then unlock Notes (fires `GET /rest/v1/notes`) or open
+Music (fires `GET /rest/v1/music_tracks`). Remote data replaces the
+bundled seeds/demo catalog only after that call resolves — an empty
+list on first paint is normal, not a failure.
+
+Do **not** try to verify Supabase inside `flutter test`: the test
+harness replaces the HTTP client, so every REST call fails with an
+empty `400` regardless of the backend.
