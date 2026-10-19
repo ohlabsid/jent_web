@@ -1,6 +1,6 @@
 # Pritjent — a macOS desktop that is secretly a portfolio 💻✨
 
-Live at **https://me-jent.web.app** · Flutter Web · Firebase Hosting
+Live at **https://jentweb.web.app** · Flutter Web · Firebase Hosting
 
 Boot it up and you don't get a website — you get a **desktop**. A
 loading screen fills a logo with water, greetings from 8 languages
@@ -103,7 +103,7 @@ flutter drive --driver=test_driver/integration_test.dart \
 ```
 
 Deploy: `flutter build web --release --base-href /` (+ same defines)
-then `firebase deploy --only hosting --project me-jent`.
+then `firebase deploy --only hosting --project jentweb`.
 
 > AI agents: start at [`AGENTS.md`](AGENTS.md) — it points into
 > [`docs/`](docs/) with the full architecture, feature, and workflow

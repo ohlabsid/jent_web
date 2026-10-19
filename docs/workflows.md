@@ -38,14 +38,26 @@ flutter gen-l10n
 `flutter gen-l10n` reads `l10n.yaml`; template file is `app_id.arb`
 — add keys to BOTH `app_en.arb` and `app_id.arb` first.
 
-## Release deploy (Firebase Hosting, project `me-jent`)
+## Release deploy (Firebase Hosting, project `jentweb`)
 ```sh
-flutter build web --release --base-href / --dart-define=... (same six)
-firebase deploy --only hosting --project me-jent
+flutter build web --release --base-href / --dart-define=... (same three)
+firebase deploy --only hosting --project jentweb
 ```
-Live at `https://me-jent.web.app`. CI (`.github/workflows/`) builds
-WITHOUT secrets — re-enable the commented secret lines there for a
-fully-featured deploy.
+Live at `https://jentweb.web.app`. CI (`.github/workflows/`) does the
+same: it reads these repo secrets and injects them as `--dart-define`s
+via `env` (quoted, so special characters are safe):
+
+| Repo secret | Maps to define |
+|---|---|
+| `SUPABASE_URL` | `SUPABASE_URL` (notes + music catalog) |
+| `SUPABASE_ANON_KEY` | `SUPABASE_ANON_KEY` |
+| `WEB3FORMS_KEY` | `WEB3FORMS_KEY` (contact form) |
+
+A secret that is missing expands to an empty define and the app
+degrades gracefully (see `backend-and-secrets.md`). Add/rotate them
+under Settings > Secrets and variables > Actions. Deploys also need
+`FIREBASE_SERVICE_ACCOUNT_ME_JENT` (project `jentweb`) and use
+`DISCORD_WEBHOOK_URL` for notifications.
 
 ## Music upload (Supabase `music` bucket + catalog rows)
 ```sh

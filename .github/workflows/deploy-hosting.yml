@@ -22,11 +22,24 @@ jobs:
         run: flutter pub get
 
       - name: Build web
-        # The contact form sends mail via Web3Forms on web. Add the secret
-        # WEB3FORMS_KEY (get one free at https://web3forms.com) and extend
-        # this to:
-        # flutter build web --release --base-href / --dart-define=WEB3FORMS_KEY=${{ secrets.WEB3FORMS_KEY }}
-        run: flutter build web --release --base-href /
+        # Values come from the repo's Actions secrets
+        # (Settings > Secrets and variables > Actions):
+        #   SUPABASE_URL, SUPABASE_ANON_KEY, WEB3FORMS_KEY
+        # Passed via env + shell expansion (quoted) so secret values
+        # with special characters can't break the command. A missing
+        # secret expands to an empty define, which the app treats as
+        # "not configured": Supabase is skipped (music falls back to
+        # the bundled demo catalog) and the contact form shows its
+        # no-key error state.
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          WEB3FORMS_KEY: ${{ secrets.WEB3FORMS_KEY }}
+        run: |
+          flutter build web --release --base-href / \
+            --dart-define=SUPABASE_URL="$SUPABASE_URL" \
+            --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" \
+            --dart-define=WEB3FORMS_KEY="$WEB3FORMS_KEY"
 
       - name: Deploy to Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
@@ -47,7 +60,7 @@ jobs:
           fi
           curl -sS -H "Content-Type: application/json" -d "{
             \"embeds\": [{
-              \"title\": \"✅ Hosting deployed — me-jent\",
+              \"title\": \"✅ Hosting deployed — jentweb\",
               \"url\": \"https://jentweb.web.app\",
               \"color\": 5763719,
               \"description\": \"A new version is live on Firebase Hosting.\",
@@ -72,7 +85,7 @@ jobs:
           fi
           curl -sS -H "Content-Type: application/json" -d "{
             \"embeds\": [{
-              \"title\": \"❌ Hosting deploy FAILED — me-jent\",
+              \"title\": \"❌ Hosting deploy FAILED — jentweb\",
               \"url\": \"https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\",
               \"color\": 15548997,
               \"description\": \"The build or deploy step failed. Check the Actions run.\",

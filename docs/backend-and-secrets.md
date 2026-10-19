@@ -1,7 +1,8 @@
 # Backend & Secrets
 
 No secret is ever committed. Web build/run takes everything via
-`--dart-define`. CI sources them from GitHub Actions secrets.
+`--dart-define`. CI sources them from GitHub Actions secrets
+(`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `WEB3FORMS_KEY`).
 
 ## `--dart-define` variables
 
